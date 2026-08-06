@@ -2,6 +2,7 @@
 __pycache__/
 *.py[cod]
 *.log
+*.apk
 
 # local Python environment
 .venv/
@@ -18,6 +19,13 @@ _llm_cache.json
 _picks_cache.json
 _sec_commentary_cache.json
 logs/
+
+# Android build outputs
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+android/.idea/
 
 # secrets / local env
 .env
