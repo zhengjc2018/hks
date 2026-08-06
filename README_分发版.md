@@ -52,6 +52,8 @@ docker run -p 8000:8000 hks
   也可从 Actions 的 `hks-apk` 工件下载。
 - 行情数据仍需联网获取（通达信 / 新浪 / 东方财富），但不需要任何你自己的云服务。
 - 首次启动会在手机内部存储生成配置文件；后台扫描和调度也在 App 内运行。
+- 安装包内置了当前网页版的 `lifecycle.json` / `positions.json` / `holdings.json`
+  初始数据快照，首次打开即可看到与网页版一致的生命周期数据。
 - 安卓源码在 `android/`，云端构建由 `.github/workflows/build-android.yml` 自动完成。
 
 ## 四、需要联网的地方（仅行情/数据）

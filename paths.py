@@ -18,8 +18,8 @@ def data_path(name: str) -> str:
     return os.path.join(data_dir(), name)
 
 
-def bundle_path(name: str) -> str:
-    return os.path.join(APP_DIR, name)
+def bundle_path(*names: str) -> str:
+    return os.path.join(APP_DIR, *names)
 
 
 def ensure_data_dir() -> None:

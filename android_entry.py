@@ -15,9 +15,16 @@ def _seed_defaults() -> None:
     os.environ["APANEL_DATA_DIR"] = data
     paths.ensure_data_dir()
 
-    defaults = {
-        "config.json": "config.example.json",
-        "strategic_overlay.json": {
+    cfg_target = paths.data_path("config.json")
+    if not os.path.exists(cfg_target):
+        cfg_src = paths.bundle_path("config.example.json")
+        if os.path.exists(cfg_src):
+            shutil.copyfile(cfg_src, cfg_target)
+        else:
+            with open(cfg_target, "w", encoding="utf-8") as f:
+                json.dump({}, f)
+
+    overlay_default = {
             "meta": {
                 "valid_from": "2026-08-06",
                 "valid_until": "2026-12-31",
@@ -26,27 +33,25 @@ def _seed_defaults() -> None:
             },
             "avoid": [],
             "favor": [],
-        },
     }
-    empty = ("positions.json", "holdings.json", "lifecycle.json", "watched_boards.json")
+    fallbacks = {
+        "lifecycle.json": [],
+        "positions.json": [],
+        "holdings.json": [],
+        "watched_boards.json": [],
+        "strategic_overlay.json": overlay_default,
+    }
 
-    for name, source in defaults.items():
+    for name, fallback in fallbacks.items():
         target = paths.data_path(name)
         if os.path.exists(target):
             continue
-        if isinstance(source, str):
-            bundled = paths.bundle_path(source)
-            if os.path.exists(bundled):
-                shutil.copyfile(bundled, target)
-                continue
+        bundled = paths.bundle_path("seed", name)
+        if os.path.exists(bundled):
+            shutil.copyfile(bundled, target)
+            continue
         with open(target, "w", encoding="utf-8") as f:
-            json.dump(source, f, ensure_ascii=False, indent=2)
-
-    for name in empty:
-        target = paths.data_path(name)
-        if not os.path.exists(target):
-            with open(target, "w", encoding="utf-8") as f:
-                json.dump([], f)
+            json.dump(fallback, f, ensure_ascii=False, indent=2)
 
 
 def start(host: str = "127.0.0.1", port: int = 5050) -> None:

@@ -28,6 +28,8 @@ android/app/build/
 android/local.properties
 android/.idea/
 android/app/src/main/python/
+!android/app/src/main/python/seed/
+!android/app/src/main/python/seed/**
 
 # secrets / local env
 .env
