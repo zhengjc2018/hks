@@ -45,14 +45,14 @@ docker run -p 8000:8000 hks
 
 ## 三、安卓 App
 
-构建产物为项目根目录下的 `A股机会雷达-debug.apk`，可直接传到安卓手机安装。
+安卓 App 使用 Chaquopy 把 Python 后端直接打进 APK，手机安装后不需要云服务、
+也不依赖本地电脑；打开 App 即在手机内部启动 Flask 并显示网页版界面。
 
-- 首次打开 App 会要求填写后端地址，默认 `http://192.168.3.9:5050/`。
-- 手机和电脑需在同一 Wi-Fi；电脑端以后端 `APANEL_HOST=0.0.0.0 APANEL_PORT=5050`
-  启动，让局域网内的手机可以访问。
-- App 右上角菜单可随时修改后端地址或刷新页面。
-- 安卓源码在 `android/`，重新构建：
-  `cd android && JAVA_HOME=/Applications/Android Studio.app/Contents/jbr/Contents/Home ./gradlew assembleDebug`
+- 安装包在 GitHub Release 中（打 `v*` tag 后由 GitHub Actions 自动构建发布），
+  也可从 Actions 的 `hks-apk` 工件下载。
+- 行情数据仍需联网获取（通达信 / 新浪 / 东方财富），但不需要任何你自己的云服务。
+- 首次启动会在手机内部存储生成配置文件；后台扫描和调度也在 App 内运行。
+- 安卓源码在 `android/`，云端构建由 `.github/workflows/build-android.yml` 自动完成。
 
 ## 四、需要联网的地方（仅行情/数据）
 
