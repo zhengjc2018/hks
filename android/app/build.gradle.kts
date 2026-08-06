@@ -57,6 +57,10 @@ val copyPythonSources = tasks.register<Copy>("copyPythonSources") {
     into(layout.projectDirectory.dir("src/main/python"))
 }
 
+tasks.matching { it.name.endsWith("PythonSources") }.configureEach {
+    dependsOn(copyPythonSources)
+}
+
 tasks.named("preBuild") {
     dependsOn(copyPythonSources)
 }
