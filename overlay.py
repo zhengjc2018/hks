@@ -20,10 +20,11 @@ import json
 import threading
 from datetime import datetime, date
 
+import paths
 from easy_tdx import UnifiedTdxClient, BoardType
 
-_OVERLAY_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "strategic_overlay.json")
-_OVERLAY_CONFIG = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.json")
+_OVERLAY_PATH = paths.data_path("strategic_overlay.json")
+_OVERLAY_CONFIG = paths.data_path("config.json")
 _OVERLAY_CFG_CACHE = {"mtime": 0, "val": True}
 _lock = threading.Lock()          # 保护本模块自身的 TDX 客户端
 _cache = {"mtime": 0, "data": None}

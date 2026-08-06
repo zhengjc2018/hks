@@ -2,6 +2,8 @@ name: Build Android APK
 
 on:
   push:
+    branches:
+      - "main"
     tags:
       - "v*"
   workflow_dispatch:
@@ -16,6 +18,10 @@ jobs:
         with:
           distribution: temurin
           java-version: "17"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
 
       - uses: android-actions/setup-android@v3
 

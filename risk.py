@@ -20,6 +20,7 @@ import os
 import datetime
 import requests
 
+import paths
 from board import classify_board
 from llm_client import call_llm
 
@@ -341,7 +342,7 @@ _SECTOR_PREV_PCT: dict = {}        # name -> 上次 LLM 时的涨跌幅（突变
 #       同日重启时当前槽 key（带日期）== 磁盘里已分析槽 key → 判为「已分析过」→
 #       直接喂回原文，零 token。跨日 key 不同 → 自然触发新分析。
 import json as _json
-_LLM_CACHE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "_llm_cache.json")
+_LLM_CACHE_FILE = paths.data_path("_llm_cache.json")
 _LLM_CACHE_DIRTY = False   # 任一缓存有更新则置位，请求末尾落盘一次（原子写防损坏）
 
 def _load_llm_cache(market_cache: dict | None = None):

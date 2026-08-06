@@ -36,6 +36,7 @@ import threading
 import pandas as pd
 import numpy as np
 
+import paths
 import server
 # 注意：对 picks 的导入延迟到函数内（见 _eval_one）。原因：server.py 以 __main__ 方式运行时，
 # picks 内部 `import server` 会触发第二份 server 模块拷贝；若 sell 在顶层 `from picks import`，
@@ -65,7 +66,7 @@ def _ext(ratio_label):
     """对外模式时把内部数值比例替换为含糊词。"""
     return _RATIO_EXTERNAL.get(ratio_label, ratio_label) if DISTRIBUTION_MODE else ratio_label
 
-POSITIONS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "positions.json")
+POSITIONS_PATH = paths.data_path("positions.json")
 
 # ===== 全局缓存（后台预计算结果）=====
 _SELL_CACHE = {"ts": 0, "data": None, "computing": False, "last_err": None}

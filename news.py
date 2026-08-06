@@ -19,9 +19,10 @@ import time
 import json
 import threading
 
+import paths
 from llm_client import load_config
 from easy_tdx.cninfo import CninfoClient
-_CACHE_DIR = os.path.join(os.path.dirname(__file__), ".news_cache")
+_CACHE_DIR = os.path.join(paths.data_dir(), ".news_cache")
 _lock = threading.Lock()
 _TTL = 3600 * 6  # 同票 6 小时内不重抓、不重发
 _NEWS_SUMMARY_CACHE: dict = {}   # code -> str|None（AI 公告解读缓存，进程级）

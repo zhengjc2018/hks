@@ -1,30 +1,35 @@
 package com.hks.app;
 
 import android.annotation.SuppressLint;
-import android.app.AlertDialog;
-import android.content.SharedPreferences;
 import android.graphics.Bitmap;
 import android.os.Bundle;
-import android.view.LayoutInflater;
+import android.os.Handler;
+import android.os.Looper;
 import android.view.Menu;
 import android.view.MenuItem;
-import android.view.View;
 import android.webkit.WebChromeClient;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
-import android.widget.EditText;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
 
+import com.chaquo.python.AndroidPlatform;
+import com.chaquo.python.PyObject;
+import com.chaquo.python.Python;
+
+import java.io.IOException;
+import java.net.HttpURLConnection;
+import java.net.URL;
+
 public class MainActivity extends AppCompatActivity {
 
-    private static final String PREFS = "hks_prefs";
-    private static final String KEY_URL = "backend_url";
-    private static final String DEFAULT_URL = "http://192.168.3.9:5050/";
+    private static final String BACKEND_URL = "http://127.0.0.1:5050/";
+    private static final int BACKEND_PORT = 5050;
 
+    private final Handler handler = new Handler(Looper.getMainLooper());
     private WebView webView;
 
     @Override
@@ -37,13 +42,7 @@ public class MainActivity extends AppCompatActivity {
 
         webView = findViewById(R.id.webView);
         setupWebView();
-
-        String saved = loadUrl();
-        if (saved.isEmpty()) {
-            showUrlDialog(null);
-        } else {
-            webView.loadUrl(saved);
-        }
+        startEmbeddedBackend();
     }
 
     @SuppressLint("SetJavaScriptEnabled")
@@ -70,49 +69,66 @@ public class MainActivity extends AppCompatActivity {
             @Override
             @SuppressWarnings("deprecation")
             public void onReceivedError(WebView view, int errorCode, String description, String failingUrl) {
-                if (failingUrl.equals(webView.getUrl())) {
-                    Toast.makeText(MainActivity.this,
-                            "无法连接后端：" + description, Toast.LENGTH_LONG).show();
-                }
+                Toast.makeText(MainActivity.this,
+                        "加载失败：" + description, Toast.LENGTH_LONG).show();
+                retryAfterDelay();
             }
         });
 
         webView.setWebChromeClient(new WebChromeClient());
     }
 
-    private String loadUrl() {
-        SharedPreferences prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
-        return prefs.getString(KEY_URL, "");
+    private void startEmbeddedBackend() {
+        try {
+            if (!Python.isStarted()) {
+                Python.start(new AndroidPlatform(this));
+            }
+            Python py = Python.getInstance();
+            PyObject entry = py.getModule("android_entry");
+            entry.callAttr("start", "127.0.0.1", BACKEND_PORT);
+            waitForBackend();
+        } catch (Exception e) {
+            Toast.makeText(this, "内置后端启动失败：" + e.getMessage(), Toast.LENGTH_LONG).show();
+        }
     }
 
-    private void saveUrl(String url) {
-        getSharedPreferences(PREFS, MODE_PRIVATE)
-                .edit()
-                .putString(KEY_URL, url)
-                .apply();
+    private void waitForBackend() {
+        new Thread(() -> {
+            for (int i = 0; i < 80; i++) {
+                if (isBackendReady()) {
+                    handler.post(() -> webView.loadUrl(BACKEND_URL));
+                    return;
+                }
+                try {
+                    Thread.sleep(300);
+                } catch (InterruptedException ignored) {
+                    return;
+                }
+            }
+            handler.post(() -> Toast.makeText(this, "内置后端启动超时", Toast.LENGTH_LONG).show());
+        }).start();
     }
 
-    private void showUrlDialog(String current) {
-        View view = LayoutInflater.from(this).inflate(R.layout.dialog_url, null);
-        EditText input = view.findViewById(R.id.urlInput);
-        String value = current == null || current.isEmpty() ? DEFAULT_URL : current;
-        input.setText(value);
-        input.setSelection(input.getText().length());
+    private boolean isBackendReady() {
+        try {
+            HttpURLConnection conn = (HttpURLConnection)
+                    new URL("http://127.0.0.1:5050/api/health").openConnection();
+            conn.setConnectTimeout(500);
+            conn.setReadTimeout(500);
+            int code = conn.getResponseCode();
+            conn.disconnect();
+            return code == 200;
+        } catch (IOException e) {
+            return false;
+        }
+    }
 
-        new AlertDialog.Builder(this)
-                .setTitle("设置后端地址")
-                .setMessage("手机与电脑需在同一 Wi-Fi，地址保持 http:// 前缀")
-                .setView(view)
-                .setPositiveButton("连接", (dialog, which) -> {
-                    String url = input.getText().toString().trim();
-                    if (!url.startsWith("http://") && !url.startsWith("https://")) {
-                        url = "http://" + url;
-                    }
-                    saveUrl(url);
-                    webView.loadUrl(url);
-                })
-                .setNegativeButton("取消", null)
-                .show();
+    private void retryAfterDelay() {
+        handler.postDelayed(() -> {
+            if (isBackendReady()) {
+                webView.loadUrl(BACKEND_URL);
+            }
+        }, 1500);
     }
 
     @Override
@@ -123,12 +139,7 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
-        int id = item.getItemId();
-        if (id == R.id.action_settings) {
-            showUrlDialog(loadUrl());
-            return true;
-        }
-        if (id == R.id.action_reload) {
+        if (item.getItemId() == R.id.action_reload) {
             webView.reload();
             return true;
         }

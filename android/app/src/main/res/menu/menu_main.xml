@@ -5,8 +5,4 @@
         android:id="@+id/action_reload"
         android:title="刷新"
         app:showAsAction="never" />
-    <item
-        android:id="@+id/action_settings"
-        android:title="设置地址"
-        app:showAsAction="never" />
 </menu>

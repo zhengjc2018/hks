@@ -28,6 +28,7 @@ import faulthandler
 import pandas as pd
 import numpy as np
 import requests
+import paths
 
 # 延迟导入 server（避免与 server 的 `import picks` 形成 import 期环；运行时 server 已完全加载）
 import server
@@ -71,7 +72,7 @@ _PICKS_CACHE = {"ts": 0, "data": None, "computing": False, "last_err": None,
                 # 扫描进度（前台/排障可见）：stage 阶段名，scanned/total 已扫/总数
                 "progress": {"stage": "", "scanned": 0, "total": 0, "hit": 0}}
 _PICKS_LOCK = threading.Lock()
-_PICKS_CACHE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "_picks_cache.json")
+_PICKS_CACHE_FILE = paths.data_path("_picks_cache.json")
 
 
 def _today_str():

@@ -32,6 +32,7 @@ from overlay import apply_overlay, board_ok_for_date   # ★v2.1 §6.8 战略叠
 import picks   # ★选股买卖点实时扫描（配套 选股买卖点SOP.md v1；后台预计算，/api/picks 秒回缓存）
 import sell     # ★持仓卖出信号（高位十字星/长下影→清仓、盈利≥30%→减仓；读 positions.json）
 import lifecycle # ★个股全生命周期状态机（双通道进自选→观察池→盘中即时提示/盘尾确认→上车→持仓→卖出三层；挂钩≥1天已废弃）
+import paths
 _TDX_LOCK = threading.Lock()   # easy_tdx 非线程安全：并发 kline/board_members 互相踩坏连接→静默返回 None。全局串行化 TDX 调用。
 
 # ---------------------------------------------------------------------------
@@ -67,7 +68,7 @@ SECTOR_LLM_MIN_NET_PCT = 2.0
 _SECTOR_DAILY_PCTS: dict[str, list[tuple[str, float]]] = {}
 _SECTOR_DAILY_MAX = 15          # 保留最近15个交易日（约3周）
 
-app = Flask(__name__, static_folder="frontend", static_url_path="/assets")
+app = Flask(__name__, static_folder=paths.bundle_path("frontend"), static_url_path="/assets")
 app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0   # 开发期禁用静态文件缓存，避免前端改完强刷仍看到旧版
 
 # ---------------------------------------------------------------------------
@@ -1011,7 +1012,7 @@ def sector_matrix(force: bool = False, net_pct: float = None):
 # ★2026-08-06 非阻塞：板块列表 TDX 拉取很慢(~22s)，改为「有缓存立即返回 + 后台异步刷新」，
 # 避免首屏 /api/sectors_lite 阻塞 22s 让用户以为崩了；启动预热让首个请求即命中热缓存。
 _SECTOR_LIST_CACHE = {"ts": 0.0, "data": None, "refreshing": False}
-_WATCHED_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "watched_boards.json")
+_WATCHED_FILE = paths.data_path("watched_boards.json")
 _LABEL_RANK = {"主推": 0, "观察": 1, "观望": 2}
 
 
@@ -1184,8 +1185,7 @@ def api_watched_boards():
 # ---------------------------------------------------------------------------
 # 板块系统评述（LLM 一句话总结，按时段缓存）
 # ---------------------------------------------------------------------------
-_COMMENTARY_CACHE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                                      "_sec_commentary_cache.json")
+_COMMENTARY_CACHE_FILE = paths.data_path("_sec_commentary_cache.json")
 _SEC_COMMENTARY_CACHE: dict = {"text": None, "ts": 0.0, "slot": None, "bk_hash": None}
 _COMMENTARY_BG_JOBS: set = set()          # 当前正在后台生成的 bk_hash，避免重复触发
 _COMMENTARY_BG_LOCK = threading.Lock()    # 保护 _COMMENTARY_BG_JOBS
@@ -1466,7 +1466,7 @@ def api_commentary_status():
 # ---------------------------------------------------------------------------
 # 持仓股标记（本地文件 holdings.json，不走账号；极简 {code,market,name,ts}）
 # ---------------------------------------------------------------------------
-HOLDINGS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "holdings.json")
+HOLDINGS_FILE = paths.data_path("holdings.json")
 
 
 def load_holdings():

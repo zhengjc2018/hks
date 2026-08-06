@@ -28,6 +28,8 @@ import json
 import threading
 import datetime
 
+import paths
+
 SEQ8_WINDOW = 8
 
 import picks
@@ -45,7 +47,7 @@ EXIT_LAYER_REDUCE = 1
 EXIT_LAYER_REDUCE_MORE = 2
 EXIT_LAYER_CLEAR = 3
 
-LIFECYCLE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "lifecycle.json")
+LIFECYCLE_PATH = paths.data_path("lifecycle.json")
 
 # ===== 锁 =====
 # _LC_LOCK    ：后台预计算「computing」标志（避免重复后台计算）

@@ -26,6 +26,7 @@ android/build/
 android/app/build/
 android/local.properties
 android/.idea/
+android/app/src/main/python/
 
 # secrets / local env
 .env

@@ -13,8 +13,9 @@ import threading
 import time
 
 import requests
+import paths
 
-CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.json")
+CONFIG_PATH = paths.data_path("config.json")
 _lock = threading.RLock()
 
 _DEFAULT = {"llm": {"enabled": False, "endpoint": "", "api_key": "", "model": ""}, "issue_form_url": ""}
