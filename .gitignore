@@ -18,6 +18,7 @@ watched_boards.json
 _llm_cache.json
 _picks_cache.json
 _sec_commentary_cache.json
+.news_cache/
 logs/
 
 # Android build outputs
