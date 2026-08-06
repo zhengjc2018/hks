@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>A股机会雷达 · 多周期共振工作台</title>
+<style>
+  :root{
+    --bg:#f4f6f9; --card:#ffffff; --line:#e6eaf0; --text:#2b3242; --sub:#8a93a6;
+    --up:#e64545; --down:#1ba784; --warn:#e8a33d; --trig:#e64545; --observe:#e8a33d;
+    --ok:#1ba784; --bad:#c7ccd6; --accent:#2f6fed;
+  }
+  [data-theme="dark"]{
+    --bg:#14181f; --card:#1c212b; --line:#2a3140; --text:#e6e9ef; --sub:#8a93a6;
+    --up:#ff5b5b; --down:#27c79a; --warn:#f0b450; --trig:#ff5b5b; --observe:#f0b450;
+    --ok:#27c79a; --bad:#3a4150; --accent:#6f9bff;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;font-size:14px;transition:background .2s,color .2s}
+  header{display:flex;align-items:center;gap:14px;padding:12px 20px;background:var(--card);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:20;flex-wrap:wrap}
+  header h1{font-size:17px;letter-spacing:1px}
+  header .posture{font-size:15px;font-weight:700;padding:4px 12px;border-radius:6px;background:#eef1f6;color:var(--text)}
+  header .posture.strong{background:#fdeaea;color:var(--up)}
+  header .ctrl{margin-left:auto;display:flex;align-items:center;gap:8px;color:var(--sub);font-size:13px;flex-wrap:wrap}
+  header input,header select,header button{font:inherit;padding:4px 10px;border:1px solid var(--line);border-radius:6px;background:var(--card);cursor:pointer;color:var(--text)}
+  .wrap{max-width:1480px;margin:0 auto;padding:16px 20px 60px}
+  section{margin-bottom:18px}
+  h2{font-size:15px;margin-bottom:10px;display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+  h2 small{color:var(--sub);font-weight:400;font-size:12px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px}
+
+  /* 大盘 */
+  .idx-row{display:flex;gap:10px;flex-wrap:wrap}
+  .idx{flex:1;min-width:120px;border:1px solid var(--line);border-radius:8px;padding:10px 12px}
+  .idx .nm{color:var(--sub);font-size:12px}
+  .idx .pr{font-size:19px;font-weight:700;margin-top:3px}
+  .idx .pc{font-size:13px;margin-top:2px}
+  .up{color:var(--up)} .down{color:var(--down)}
+  .mkt-bottom{display:flex;gap:14px;margin-top:12px;align-items:center;flex-wrap:wrap}
+  .breadth span{color:var(--sub)} .breadth b{font-size:16px}
+  .mkt-comm{margin-top:12px;padding:10px 14px;background:linear-gradient(135deg,#eef4ff,#f5f8ff);border:1px solid #c5d9ff;border-radius:8px;font-size:12.5px;line-height:1.7;color:#334155}
+  .mkt-comm .mc-title{font-weight:700;color:var(--accent);margin-bottom:4px;font-size:13px}
+  [data-theme="dark"] .mkt-comm{background:#1c2536;border-color:#2a3a55;color:#c3cee0}
+
+  /* 板块（横幅浅色，独立开关；角标拆战略关注/战略回避） */
+  .regime-banner{margin:0 0 10px;padding:7px 12px;border-radius:8px;background:#eef4ff;border:1px solid #c5d9ff;color:var(--accent);font-size:13px;font-weight:600;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .regime-banner b{color:#1f4fb0}
+  .regime-banner .regime-label{white-space:nowrap}
+  .regime-banner .regime-note{font-size:12px;font-weight:500;color:#5a6c8a;background:#fff;border:1px solid #c5d9ff;border-radius:6px;padding:2px 10px;white-space:nowrap}
+  .regime-banner .regime-note.empty{color:#8a93a6;background:#f4f6f9;border-style:dashed}
+  .regime-banner .ov-toggle{margin-left:auto;font:inherit;font-size:12px;padding:3px 12px;border-radius:6px;border:1px solid #c5d9ff;background:#fff;color:var(--accent);cursor:pointer}
+  .regime-banner .ov-toggle.off{background:#eef1f6;color:var(--sub);border-color:var(--line)}
+  /* 评述与摘要并入蓝框内（不再单独黄色横幅） */
+  .regime-banner .regime-commentary{flex-basis:100%;font-size:12.5px;font-weight:500;color:#33415c;line-height:1.55;padding-top:3px;margin-top:2px;border-top:1px dashed #c5d9ff}
+  .regime-banner .regime-commentary .rc-time{color:#8a9bb8;font-size:11px;margin-left:6px}
+  .regime-banner .regime-summary{flex-basis:100%;font-size:11.5px;color:#5a6c8a;padding-top:2px}
+  .regime-banner .regime-summary b{color:#1f4fb0}
+  [data-theme="dark"] .regime-banner .regime-commentary{color:#c3cee0;border-top-color:#2a3a55}
+  [data-theme="dark"] .regime-banner .regime-summary{color:#9bb4e8}
+  [data-theme="dark"] .regime-banner .regime-summary b{color:#cdd9f2}
+  [data-theme="dark"] .regime-banner{background:#1c2536;border-color:#2a3a55;color:#9bb4e8}
+  [data-theme="dark"] .regime-banner b{color:#cdd9f2}
+  [data-theme="dark"] .regime-banner .regime-note{color:#9bb4e8;background:#222a38;border-color:#2a3a55}
+  [data-theme="dark"] .regime-banner .regime-note.empty{color:#8a93a6;background:#1c212b}
+  [data-theme="dark"] .regime-banner .ov-toggle{background:#222a38;color:#9bb4e8;border-color:#2a3a55}
+  .sec-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px}
+  .sec{border:1px solid var(--line);border-radius:8px;padding:10px 12px;cursor:pointer;transition:.15s;position:relative;background:var(--card);display:flex;flex-direction:column;overflow:hidden}
+  .sec:hover{box-shadow:0 2px 10px rgba(0,0,0,.08)}
+  .sec.main{border-color:var(--ok);box-shadow:0 0 0 1px var(--ok) inset}
+  .sec .nm{font-weight:600;font-size:14px;padding-right:70px;min-height:20px}
+  .sec .pc{font-size:15px;font-weight:700;margin-top:4px}
+  .sec .net{color:var(--sub);font-size:12px;margin-top:2px}
+  .sec .st{position:absolute;top:8px;right:8px;font-size:11px;padding:1px 6px;border-radius:4px;background:#eef1f6;color:var(--sub);z-index:2}
+  .sec.main .st{background:var(--ok);color:#fff}
+  .sec .flag{position:absolute;top:28px;right:8px;font-size:10px;padding:1px 5px;border-radius:4px;margin-left:0;font-weight:600;z-index:2}
+  .sec .sum{margin-top:20px;font-size:11px;color:#5d6678;line-height:1.45}
+  /* 资金左部色带：色相=方向（红=净流入/绿=净流出），深浅=占成交额比例；5档离散[6,3.5,1.5,0.6,0]%，<0.6%无色带 */
+  .sec.flow-in-1{border-left:4px solid #990A0A}
+  .sec.flow-in-2{border-left:4px solid #D63A2F}
+  .sec.flow-in-3{border-left:4px solid #E8877E}
+  .sec.flow-in-4{border-left:4px solid #FDE7E7}
+  .sec.flow-out-1{border-left:4px solid #044306}
+  .sec.flow-out-2{border-left:4px solid #2E7D32}
+  .sec.flow-out-3{border-left:4px solid #7BC47F}
+  .sec.flow-out-4{border-left:4px solid #E7FDE8}
+  .sec .star{position:absolute;top:7px;left:9px;font-size:12px;color:#d9b400}
+  /* 战略关注 / 战略回避 两种角标（浅色）：绝对定位在右上角 state 标签下方，避免遮挡 */
+  .sec .flag-favor{background:#e8f6f1;color:var(--ok);border:1px solid #b6e3cb}
+  .sec .flag-avoid{background:#fdecec;color:#c0392b;border:1px solid #f3b5b5}
+  [data-theme="dark"] .sec .flag-favor{background:#13352b;border-color:#1f5a45}
+  [data-theme="dark"] .sec .flag-avoid{background:#3a2326;border-color:#5a2a2e}
+  /* 板块工具栏 + 搜索联想 + 加载更多 */
+  .sec-toolbar{position:relative;display:flex;align-items:center;gap:12px;margin:-2px 0 12px}
+  .sec-search{padding:7px 12px;border:1px solid var(--line);border-radius:8px;font:inherit;font-size:13px;width:300px;background:var(--card)}
+  .sec-search:focus{outline:none;border-color:var(--accent)}
+  .watch-hint{font-size:12px;color:var(--sub)}
+  .watch-hint.warn{color:#c0392b}
+  .search-suggest{position:absolute;top:38px;left:0;z-index:30;background:var(--card);border:1px solid var(--line);border-radius:8px;box-shadow:0 6px 20px rgba(0,0,0,.12);width:320px;max-height:320px;overflow:auto;padding:4px}
+  .search-suggest .sg-item{padding:7px 10px;border-radius:6px;cursor:pointer;font-size:13px;display:flex;align-items:center;gap:8px}
+  .search-suggest .sg-item:hover{background:var(--hover,#eef2f8)}
+  .search-suggest .sg-tag{margin-left:auto;font-size:11px;color:var(--sub);background:#eef1f6;padding:1px 7px;border-radius:4px}
+  .load-more-wrap{display:flex;justify-content:center;margin:14px 0 4px}
+  .load-more{padding:8px 22px;border:1px solid var(--line);border-radius:20px;background:var(--card);color:var(--accent);font:inherit;font-size:13px;cursor:pointer}
+  .load-more:hover{background:#eef2f8}
+  /* 系统评述已并入 regime 蓝框（regime-commentary），此处不再单独黄框 */
+  .sec .sum.loading{color:#aab;font-style:italic}
+
+  /* 个股表（点板块加载） */
+  .empty-hint{color:var(--sub);font-size:13px;padding:24px 8px;text-align:center;background:#fafbfc;border:1px dashed var(--line);border-radius:8px}
+  [data-theme="dark"] .empty-hint{background:#161b22;border-color:#2a3140}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{padding:8px 10px;text-align:right;border-bottom:1px solid var(--line)}
+  th{color:var(--sub);font-weight:500;font-size:12px;background:#fafbfc}
+  td.l,th.l{text-align:left}
+  tr.stk{cursor:pointer} tr.stk:hover{background:#f7f9fc}
+  tr.trig{background:#fdeaea} tr.observe{background:#fdf3e6}
+  .lv{font-weight:700;padding:1px 8px;border-radius:5px;font-size:12px}
+  .lv.触发{background:var(--trig);color:#fff} .lv.观察{background:var(--observe);color:#fff} .lv.无{background:var(--bad);color:#fff}
+  .score-bar{height:6px;border-radius:3px;background:#eef1f6;overflow:hidden;width:70px;display:inline-block;vertical-align:middle}
+  .score-bar i{display:block;height:100%;background:var(--ok)}
+  .sig{display:flex;flex-wrap:wrap;gap:3px;justify-content:flex-end}
+  .sig em{font-style:normal;font-size:11px;padding:1px 5px;border-radius:4px;background:#eef1f6;color:var(--sub)}
+  .sig em.p{background:#e8f6f1;color:var(--ok)} .sig em.f{background:#fdeaea;color:var(--up)}
+  .badge{display:inline-block;font-size:11px;padding:1px 6px;border-radius:4px;font-weight:600;vertical-align:middle}
+  .badge.main{background:#e8f6f1;color:var(--ok)} .badge.other{background:#eef1f6;color:var(--sub)}
+  [data-theme="dark"] table th{background:#222a38}
+  [data-theme="dark"] tr.stk:hover{background:#222a38}
+  [data-theme="dark"] tr.trig{background:#3a2326} [data-theme="dark"] tr.trig td{color:#ffd5d5}
+  [data-theme="dark"] tr.observe{background:#3a2f1f} [data-theme="dark"] tr.observe td{color:#f3d9b0}
+  [data-theme="dark"] .score-bar{background:#2a3140}
+  [data-theme="dark"] .sig em{background:#2a3140;color:#8a93a6}
+  [data-theme="dark"] .sig em.p{background:#13352b;color:#27c79a}
+  [data-theme="dark"] .sig em.f{background:#3a2326;color:#ff5b5b}
+  [data-theme="dark"] .badge.main{background:#13352b;color:#27c79a}
+  [data-theme="dark"] .badge.other{background:#2a3140;color:#8a93a6}
+  [data-theme="dark"] .lv.无{background:#3a4150}
+
+  /* 状态机漏斗 v4（待上车→观察池，持仓移至独立页） */
+  .lc-stage{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:14px}
+  .lc-stage h3{font-size:14px;margin-bottom:4px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .lc-stage .lc-cnt{font-size:11px;color:var(--sub);background:#eef1f6;border-radius:10px;padding:0 7px;font-weight:700}
+  .lc-lead{display:flex;align-items:center;gap:8px;margin:10px 0 8px;color:var(--sub);font-size:12px}
+  .lc-lead .bar{height:3px;flex:1;border-radius:2px;background:linear-gradient(90deg,var(--up),var(--observe))}
+  .lc-lead.flat .bar{background:var(--line)}
+  .lc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(232px,1fr));gap:12px}
+  .lc-card{border:1px solid var(--line);border-radius:8px;padding:10px 11px;background:var(--card);position:relative;min-height:96px}
+  .lc-card.lc-clickable{cursor:pointer;transition:border-color .15s,box-shadow .15s}
+  .lc-card.lc-clickable:hover{border-color:var(--accent,#3b82f6);box-shadow:0 0 0 1px var(--accent,#3b82f6) inset}
+  .lc-card .lc-name{font-weight:700;font-size:13px;display:flex;align-items:center;gap:5px}
+  .lc-card .lc-code{color:var(--sub);font-size:11px}
+  .lc-card .lc-meta{color:var(--sub);font-size:11px;margin-top:4px;display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+  .lc-card .lc-ch{font-size:10px;padding:0 5px;border-radius:4px;font-weight:700}
+  .lc-ch.A{background:#eef4ff;color:var(--accent)} .lc-ch.B{background:#eef1f6;color:var(--sub)}
+  .lc-trend{font-size:10px;padding:0 5px;border-radius:4px;font-weight:700}
+  .lc-trend.main{background:#fdecea;color:#e0413e}
+  .lc-trend.early{background:#eafaf0;color:#1a9e5a}
+  /* ★E：双创标签（方块） */
+  .tag-kc, .tag-cy{display:inline-block;font-size:10px;line-height:1;font-weight:700;padding:2px 4px;border-radius:3px;vertical-align:middle}
+  .tag-kc{background:#fdecec;color:#c0392b;border:1px solid #f5c6c6}
+  .tag-cy{background:#eafaf1;color:#1e8449;border:1px solid #bfe6cf}
+  /* ★D：个股表代码（与 .lc-code 同款） */
+  .stock-table .lc-code{color:var(--sub);font-size:11px}
+  .lc-tier{font-size:10px;padding:0 5px;border-radius:4px;background:#fdf3e6;color:#c77700;font-weight:700}
+  .lc-badge-clear{font-size:11px;font-weight:700;padding:1px 6px;border-radius:4px;background:#fdecec;color:#c0392b;display:inline-block;margin-top:5px}
+  .lc-actions{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
+  .lc-actions button{font:inherit;font-size:11px;padding:4px 10px;border-radius:6px;border:1px solid var(--line);background:var(--card);cursor:pointer;color:var(--text)}
+  .lc-actions button.primary{background:var(--ok);color:#fff;border-color:var(--ok)}
+  .lc-actions button.danger{background:#fdecec;color:#c0392b;border-color:#f3b5b5}
+.lc-actions button.ghost{color:var(--sub)}
+/* 持仓星标 */
+.lc-star,.stock-star{cursor:pointer;font-size:14px;color:#d9b400;margin-right:3px;transition:transform .1s}
+.lc-star:hover,.stock-star:hover{transform:scale(1.2)}
+.lc-star.on,.stock-star.on{color:#f59e0b}
+.lc-card.holding{border-color:#f59e0b;box-shadow:0 0 0 1px #f59e0b inset}
+.stock-star{font-size:13px}
+.lc-scroll{max-height:230px;overflow:auto;border-top:1px dashed var(--line);margin-top:6px;padding-top:10px}
+  /* 待上车按板块分组 */
+  .board-group{margin-bottom:12px}
+  .bg-head{display:flex;align-items:center;gap:10px;font-size:12px;color:var(--sub);padding:5px 2px;border-bottom:1px solid var(--line);margin-bottom:8px}
+  .bg-name{font-weight:700;color:var(--text);font-size:13px}
+  .bg-w{background:#eef4ff;color:var(--accent);padding:1px 8px;border-radius:10px;font-weight:700}
+  [data-theme="dark"] .bg-w{background:#1c2536}
+  .bg-cnt{color:var(--sub)}
+
+  /* 弹窗（设置 / 持仓） */
+  .modal-mask{position:fixed;inset:0;background:rgba(20,24,31,.5);display:none;align-items:center;justify-content:center;z-index:50}
+  .modal-mask.show{display:flex}
+  .modal{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:20px;width:min(600px,92vw);max-height:86vh;overflow:auto}
+  .modal h3{margin-bottom:14px;font-size:15px}
+  .modal .close{float:right;cursor:pointer;color:var(--sub);font-size:20px;border:none;background:none;line-height:1}
+  .modal .row{margin-bottom:16px}
+  .modal label{display:block;font-size:12px;color:var(--sub);margin-bottom:6px}
+  .modal input[type=number],.modal select{font:inherit;padding:5px 8px;border:1px solid var(--line);border-radius:6px;background:var(--card);color:var(--text)}
+  .modal .chk{display:inline-flex;align-items:center;gap:5px;margin-right:16px;font-size:13px;color:var(--text);cursor:pointer}
+  .modal button.primary{background:var(--ok);color:#fff;border:1px solid var(--ok);padding:6px 18px;border-radius:6px;cursor:pointer;font:inherit}
+  /* 个股详情页内弹窗（iframe 复用 /preview） */
+  .preview-modal{width:min(980px,96vw);max-height:92vh;padding:0;overflow:hidden}
+  .preview-modal .close{position:absolute;top:6px;right:14px;z-index:3;font-size:22px}
+  .preview-modal iframe{display:block;width:100%;height:92vh;border:none;border-radius:0 0 12px 12px}
+  .set-group{margin-bottom:20px;border-top:1px solid var(--line);padding-top:14px}
+  .set-group:first-of-type{border-top:none;padding-top:0;margin-bottom:8px}
+  .set-title{font-weight:700;font-size:13px;margin-bottom:12px;color:var(--text)}
+  .inline-f{display:inline-flex;align-items:center;gap:6px;margin-right:14px}
+
+  /* 加载状态 */
+  .loading{text-align:center;padding:30px;color:var(--sub);font-size:13px}
+  .loading::after{content:'';display:inline-block;width:20px;height:20px;border:2px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:spin .6s linear infinite;vertical-align:middle;margin-left:8px}
+  @keyframes spin{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>A股机会雷达 · 多周期共振工作台</h1>
+  <span class="posture" id="postureTag">--</span>
+  <div class="ctrl">
+    <span style="position:relative;display:inline-block">
+      <input placeholder="代码查买点 600519" id="stockSearchInput" style="width:140px" onfocus="showStockHist()" onblur="hideStockHist()">
+      <div id="stockHist" class="search-suggest" style="display:none;left:0;top:34px;width:240px"></div>
+    </span>
+    <button id="btnSearchStock">查买点</button>
+    <button onclick="openModal('positionsModal')">我的持仓</button>
+    <button onclick="openSettings()">⚙ 设置</button>
+    <button onclick="reportIssue()">📝 上报问题</button>
+    <button id="themeBtn">🌙 夜间</button>
+    <select id="refreshInterval"><option value="15">15s</option><option value="10">10s</option><option value="30">30s</option></select>
+    <button id="btnPause">暂停</button>
+    <span id="updated">--</span>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <!-- 区1 大盘定调 -->
+  <section id="market">
+    <h2>大盘定调 <small id="marketSub">加载中...</small></h2>
+    <div class="card">
+      <div class="idx-row" id="idxRow"></div>
+      <div class="mkt-bottom">
+        <div class="breadth" id="breadth"></div>
+      </div>
+      <div class="mkt-comm" id="mktComm" style="display:none">
+        <div class="mc-title">📊 大盘走势评述</div>
+        <div id="mktCommText"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 区2 机会板块矩阵 -->
+  <section id="sectors">
+    <h2>机会板块矩阵 <small>首屏展示 24 个，其余折叠；点击卡片加载该板块个股买点；卡片左侧色带=资金流向（红=净流入/绿=净流出，越深占比越高）</small></h2>
+    <div class="regime-banner" id="regimeBanner" style="display:none">
+      <span class="regime-label">战略叠加层 · 当前 Regime：<b id="regimeText"></b></span>
+      <span class="regime-note" id="regimeNote">当前时段暂无评述</span>
+      <button class="ov-toggle" id="ovBtn" data-on="1">战略叠加：开</button>
+      <div class="regime-summary" id="regimeSummary"></div>
+      <div class="regime-commentary" id="regimeCommentary" style="display:none"></div>
+    </div>
+    <div class="sec-toolbar">
+      <input id="boardSearch" class="sec-search" placeholder="搜索板块名，点击结果添加/取消关注 ★" oninput="onBoardSearch()" onfocus="onBoardSearch()" />
+      <div id="searchSuggest" class="search-suggest" style="display:none"></div>
+      <span id="watchHint" class="watch-hint" style="display:none"></span>
+    </div>
+    <div class="sec-grid" id="secGrid">
+      <div class="loading">正在加载板块数据...</div>
+    </div>
+    <div id="loadMoreWrap" class="load-more-wrap" style="display:none">
+      <button class="load-more" id="loadMoreBtn" onclick="toggleMore()">加载更多板块 ▼</button>
+    </div>
+    <div class="sec-grid" id="secGridMore" style="display:none"></div>
+  </section>
+
+  <!-- 区3 个股买点（默认空白，点板块加载） -->
+  <section id="stocks">
+    <h2>个股买点 <small>点击上方板块加载该板块内个股（未选板块时不显示）</small></h2>
+    <div class="card">
+      <div class="empty-hint" id="stockEmpty">点击上方任意板块卡片，下方加载该板块内符合多周期共振的个股买点 →</div>
+      <div id="stockTable" style="display:none">
+        <div id="stockBoardName" style="font-weight:700;margin-bottom:8px"></div>
+        <table>
+          <thead><tr><th class="l">名称 / 代码</th><th>现价 / 涨跌</th><th>五条件（绿=通过）</th><th>阶段</th><th class="l">序贯状态</th><th class="l">周/日 RSI</th></tr></thead>
+          <tbody id="stockBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- 区4 状态机漏斗 v4（待上车→观察池；持仓移到独立页） -->
+  <section id="lifecycle">
+    <h2>个股生命周期 · 状态机漏斗 <small>观察池(通道A自动灌入·按tier排序) → 待上车（按板块权重排列）；持仓移至右上「我的持仓」独立页</small></h2>
+
+    <!-- ② 待上车（顶，按板块权重分组） -->
+    <div class="lc-stage" id="lcReadyStage" style="display:none">
+      <h3>② 待上车 <span class="lc-cnt" id="readyCnt">0</span> <small style="color:var(--sub);font-weight:400">④已就绪且⑤触发 / 当日直接合并命中 · 按板块权重降序</small></h3>
+      <div id="lcReadyContent"></div>
+    </div>
+
+    <!-- ① 观察池（底） -->
+    <div class="lc-stage" id="lcWatchStage" style="display:none">
+      <h3>① 观察池 <span class="lc-cnt" id="watchCnt">0</span> <small style="color:var(--sub);font-weight:400">通道A自动灌入 · 按 tier 排序</small></h3>
+      <div id="lcWatchContent"></div>
+    </div>
+  </section>
+
+</div>
+
+<!-- 我的持仓 独立弹窗 -->
+<div class="modal-mask" id="positionsModal">
+  <div class="modal">
+    <button class="close" onclick="closeModal('positionsModal')">×</button>
+    <h3>我的持仓</h3>
+    <div id="posHoldingArea">
+      <div class="empty-hint" style="padding:16px">暂无持仓数据</div>
+    </div>
+    <div id="posExitArea" style="display:none;margin-top:14px">
+      <div class="lc-lead"><span>提示离场 · 持仓且触发卖点规则</span><span class="bar"></span></div>
+      <div id="posExitList" class="lc-grid"></div>
+    </div>
+  </div>
+</div>
+
+<!-- 设置 弹窗（个股筛选 + 战略叠加层） -->
+<div class="modal-mask" id="settingsModal">
+  <div class="modal">
+    <button class="close" onclick="closeModal('settingsModal')">×</button>
+    <h3>设置</h3>
+
+    <div class="set-group">
+      <div class="set-title">个股筛选</div>
+      <div class="row">
+        <label>股价范围（元）</label>
+        <input type="number" placeholder="最低" id="filtPriceMin" style="width:100px"> — <input type="number" placeholder="最高" id="filtPriceMax" style="width:100px">
+      </div>
+      <div class="row">
+        <label>交易权限</label>
+        <label class="chk"><input type="checkbox" checked id="filtMain"> 沪深主板</label>
+        <label class="chk"><input type="checkbox" checked id="filtChiNext"> 双创（科创 / 创业）</label>
+        <label class="chk"><input type="checkbox" id="filtSt"> 含 ST（默认不含）</label>
+      </div>
+      <div class="row">
+        <label>股票市值</label>
+        <select id="filtMcap">
+          <option value="">全市场</option>
+          <option value="small">小盘（＜100亿）</option>
+          <option value="mid">中盘（100–500亿）</option>
+          <option value="large">大盘（＞500亿）</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="set-group">
+      <div class="set-title">大模型（LLM）配置</div>
+      <div class="row">
+        <label class="chk"><input type="checkbox" id="llmEnabled"> 启用自定义模型（不配置则走规则模板兜底，不产生费用）</label>
+      </div>
+      <div class="row">
+        <label>API 地址</label>
+        <input type="text" id="llmEndpoint" placeholder="https://xxx/v1" style="width:260px">
+      </div>
+      <div class="row">
+        <label>API Key</label>
+        <input type="password" id="llmKey" placeholder="留空 = 不修改已保存的 key" style="width:260px">
+      </div>
+      <div class="row">
+        <label>模型名</label>
+        <input type="text" id="llmModel" placeholder="如 gpt-3.5-turbo / glm-4" style="width:200px">
+      </div>
+      <div class="row">
+        <button type="button" onclick="testLlm()">测试连接</button>
+        <span id="llmTestMsg" style="margin-left:8px;color:var(--sub);font-size:12px"></span>
+      </div>
+    </div>
+
+    <div class="row" style="text-align:right;margin-bottom:0">
+      <button class="primary" onclick="saveSettings()">确定</button>
+    </div>
+  </div>
+</div>
+
+<!-- 个股详情 页内弹窗（iframe 复用 /preview，自动按 URL 参数加载对应股票） -->
+<div class="modal-mask" id="previewModal">
+  <div class="modal preview-modal">
+    <button class="close" onclick="closeModal('previewModal')">×</button>
+    <iframe id="previewFrame" title="个股详情"></iframe>
+  </div>
+</div>
+
+<script src="/assets/app.js?v=20260806k"></script>
+</body>
+</html>

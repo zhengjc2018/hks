@@ -1,0 +1,16 @@
+.git
+.DS_Store
+.venv
+__pycache__
+*.pyc
+logs
+config.json
+positions.json
+holdings.json
+lifecycle.json
+strategic_overlay.json
+watched_boards.json
+_llm_cache.json
+_picks_cache.json
+_sec_commentary_cache.json
+docs

@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>详情布局预览 · A股机会雷达</title>
+<script src="/echarts.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+         background: #f0f2f5; color: #1f2329; padding: 16px; }
+  .toolbar { max-width: 1280px; margin: 0 auto 12px; display: flex; gap: 8px; align-items: center; }
+  .toolbar input { padding: 7px 10px; border: 1px solid #d0d5dd; border-radius: 6px; font-size: 14px; width: 130px; }
+  .toolbar button { padding: 7px 16px; border: 0; border-radius: 6px; background: #2f6fed; color: #fff; cursor: pointer; font-size: 14px; }
+  .toolbar .hint { color: #8a8f99; font-size: 12px; }
+
+  .modal { max-width: 1280px; margin: 0 auto; background: #fff; border-radius: 12px;
+           box-shadow: 0 8px 30px rgba(0,0,0,.12); overflow: hidden; }
+  .m-head { display: flex; align-items: center; gap: 10px; padding: 14px 18px; border-bottom: 1px solid #eef0f3; flex-wrap: wrap; }
+  .m-title { font-size: 18px; font-weight: 700; }
+  .badge { font-size: 12px; padding: 2px 8px; border-radius: 10px; }
+  .badge.main { background: #e8f5e9; color: #1b8a3a; }
+  .badge.dual { background: #fff3e0; color: #c77700; }
+  .pv-star { cursor: pointer; font-size: 20px; color: #d9b400; margin-left: 4px; vertical-align: middle; }
+  .pv-star.on { color: #f59e0b; }
+  .m-sub { margin-left: auto; font-size: 13px; color: #5a6068; }
+
+  .m-body { display: grid; grid-template-columns: 2fr 1fr; gap: 12px; padding: 12px; height: 82vh; }
+  .col-left { display: flex; flex-direction: column; gap: 8px; min-height: 0; }
+  .col-right { display: flex; flex-direction: column; gap: 8px; min-height: 0; }
+
+  .panel { background: #fafbfc; border: 1px solid #eef0f3; border-radius: 8px; padding: 6px 8px; position: relative; }
+  .panel h4 { font-size: 12px; color: #6b7280; margin: 2px 4px 4px; font-weight: 600; }
+  .chart { width: 100%; }
+  /* 图内实时指标值浮层（HTML 绝对定位，绕开 ECharts title 富文本限制，确保彩色生效） */
+  .ival { position: absolute; left: 10px; bottom: 4px; z-index: 6; font-size: 11px;
+          font-weight: bold; line-height: 1.5; pointer-events: none;
+          text-shadow: 0 0 4px #fff, 0 0 4px #fff, 0 0 4px #fff; }
+
+  #cK { flex: 1.4; }
+  #cMacd { flex: 1; }
+  #cRsi { flex: 0.85; }
+  #sigList { flex: 1; overflow-y: auto; min-height: 160px; }
+
+  /* 信号明细 —— 两列对齐 + 红绿着色 */
+  /* 左列加宽到 210px，缓解右侧文字过挤（原 168px） */
+  .sig-row { display: flex; align-items: baseline; gap: 10px; padding: 5px 6px; font-size: 13px;
+             border-bottom: 1px dashed #eef0f3; line-height: 1.6; }
+  .sig-row:last-child { border-bottom: 0; }
+  /* 信号明细内部列比例：信号名 1/3、明细 2/3（用户明确布局建议） */
+  .sig-label { width: 33%; flex: 0 0 33%; text-align: left; }
+  .sig-detail { flex: 1; word-break: break-all; }
+  /* ★2026-08-05 双路径徽标 */
+  .sig-trend { font-size: 12px; font-weight: 700; padding: 4px 8px; border-radius: 6px; margin-bottom: 6px; }
+  .sig-trend.main  { background: #fdecea; color: #e0413e; }
+  .sig-trend.early { background: #eafaf0; color: #1a9e5a; }
+  .sig-trend.none  { background: #eef1f6; color: #8a8f99; }
+  /* ★Part2 初期票第一个金叉买点高亮 */
+  .sig-golden { font-size: 12.5px; font-weight: 700; color: #c77700; background: #fff8e6;
+                border: 1px solid #ffe0a3; border-radius: 6px; padding: 5px 8px; margin-bottom: 6px; }
+
+  /* 入场点位面板（原雷达图位置） */
+  #cEntry { flex: 0 0 auto; max-height: 42%; overflow-y: auto; }
+  .entry-line { font-size: 12.5px; line-height: 1.7; color: #333; }
+  .entry-sub { color: #8a8f99; font-size: 11.5px; }
+
+  /* 通过：全文绿色 */
+  .sig-pass .sig-label, .sig-pass .sig-detail { color: #1b8a3a; }
+  .sig-pass .sig-label { font-weight: 600; }
+
+  /* 不通过：信号名红；明细黑；数字加粗标红；无数字则明细全红 */
+  .sig-fail .sig-label { color: #e04545; font-weight: 700; }
+  .sig-fail .sig-detail { color: #1a1a1a; }
+  .sig-fail .num-red { color: #e04545; font-weight: 700; }
+  .sig-fail .sig-detail-allred { color: #e04545; }
+
+  /* 部分符合（含子项）：整信号名中性，子项各自着色 */
+  .sig-partial .sig-label { color: #333; font-weight: 600; }
+  .sub-item { display: inline-block; margin: 2px 14px 2px 0; font-weight: 700; }
+  .sub-ok { color: #1b8a3a; }     /* 子项通过 → 绿 */
+  .sub-bad { color: #e04545; }     /* 子项不通过 → 红 */
+
+  /* 底部通栏 */
+  .bottom-area { padding: 0 12px 12px; display: flex; flex-direction: column; gap: 8px; }
+  .summary-bar {
+    background: linear-gradient(135deg,#f0f5ff,#fafbff); border: 1px solid #d6e4ff;
+    border-radius: 8px; padding: 10px 16px; font-size: 13.5px; line-height: 1.6; color: #333;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .summary-bar .sum-label { font-weight: 700; color: #2f6fed; white-space: nowrap; }
+  .summary-bar .sum-text { flex: 1; }
+  .summary-bar .sum-placeholder { color: #bbb; font-style: italic; }
+  .risk-full { background: #fff; border: 1px solid #eef0f3; border-radius: 8px; overflow: hidden; }
+  .risk-full h4 { font-size: 12px; color: #6b7280; margin: 0; padding: 8px 12px 4px; font-weight: 600;
+                  background: #fafbfc; border-bottom: 1px solid #eef0f3; }
+  table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid #eef0f3; }
+  th { color: #8a8f99; font-weight: 600; background: #f5f6f8; }
+  .flag { font-weight: 700; }
+  .flag.ok { color: #1b8a3a; }
+  .flag.warn { color: #c77700; }
+  .flag.bad { color: #e04545; }
+  .loading { padding: 30px; text-align: center; color: #8a8f99; }
+</style>
+</head>
+<body>
+  <div class="toolbar">
+    <input id="pvCode" value="600519" />
+    <button id="pvGo">查买点预览</button>
+    <span class="hint">试试 600519(主板) / 300750(创业板·双创) / 688981(科创板·双创)</span>
+  </div>
+
+  <div class="modal">
+    <div class="m-head">
+      <span class="m-title" id="pvTitle">—</span>
+      <span class="pv-star" id="pvStar" onclick="pvToggleHolding(event)" title="点击加入持仓">☆</span>
+      <span id="pvBadge"></span>
+      <span class="m-sub" id="pvSub"></span>
+    </div>
+
+    <div class="m-body">
+      <!-- 左栏：K线 / MACD / RSI（实时指标值彩色化，与图内线色一致） -->
+      <div class="col-left">
+        <div class="panel" id="cK"><h4>K线 · 日K（MA5/10/20/40）</h4><div class="chart" id="chartK" style="height:100%"></div><div class="ival" id="ivalK"></div></div>
+        <div class="panel" id="cMacd"><h4>MACD（DIF/DEA/HIST）</h4><div class="chart" id="chartMacd" style="height:100%"></div><div class="ival" id="ivalMacd"></div></div>
+        <div class="panel" id="cRsi"><h4>RSI（14 / 6）</h4><div class="chart" id="chartRsi" style="height:100%"></div><div class="ival" id="ivalRsi"></div></div>
+      </div>
+
+      <!-- 右栏：入场点位预测（原雷达位） + 信号明细（表头下移） -->
+      <div class="col-right">
+        <div class="panel" id="cEntry"><h4>入场点位预测（确定性参考）</h4><div id="entryBody"></div></div>
+        <div class="panel" id="sigList"><h4>信号明细</h4><div id="sigBody"></div></div>
+      </div>
+    </div>
+
+    <!-- 底部通栏：一句话总结 + 风险复检 -->
+    <div class="bottom-area">
+      <div class="summary-bar" id="summaryBar">
+        <span class="sum-label">📋 总结</span>
+        <span class="sum-text sum-placeholder" id="sumText">（待确认内文 — 排版OK后填写）</span>
+      </div>
+      <div class="risk-full">
+        <h4>风险独立复检（AlphaLoop）</h4>
+        <div id="riskBody"></div>
+      </div>
+    </div>
+  </div>
+
+<script>
+const UP = '#e04545', DOWN = '#1aa260';   // 涨红 跌绿
+let _pvHoldings = new Map();
+let _pvCode = '', _pvMarket = 0, _pvName = '';
+function pvHoldKey(code, market){ return code + '|' + market; }
+async function pvLoadHoldings(){
+  try{
+    const r = await fetch('/api/holdings');
+    const d = await r.json();
+    _pvHoldings = new Map((d.holdings||[]).map(h => [pvHoldKey(h.code, h.market), h]));
+  }catch(e){ console.warn('持仓标记加载失败', e); }
+  pvRefreshStar();
+}
+function pvIsHolding(){ return _pvHoldings.has(pvHoldKey(_pvCode, _pvMarket)); }
+function pvRefreshStar(){
+  const el = document.getElementById('pvStar');
+  if(!el) return;
+  const on = pvIsHolding();
+  el.textContent = on ? '★' : '☆';
+  el.classList.toggle('on', on);
+  el.title = on ? '已加入持仓，点击移除' : '点击加入持仓';
+}
+async function pvToggleHolding(ev){
+  if(ev) ev.stopPropagation();
+  if(!/^\d{6}$/.test(_pvCode)) return;
+  const adding = !pvIsHolding();
+  try{
+    await fetch('/api/holdings', {method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({action: adding?'add':'remove', code: _pvCode, market: _pvMarket, name: _pvName})});
+    if(adding) _pvHoldings.set(pvHoldKey(_pvCode, _pvMarket), {code: _pvCode, market: _pvMarket, name: _pvName});
+    else _pvHoldings.delete(pvHoldKey(_pvCode, _pvMarket));
+    pvRefreshStar();
+  }catch(e){ alert('操作失败：'+e.message); }
+}
+// 指标专属色（与图内均线/线色一致，避免和涨跌红绿混淆）
+const C = { ma5:'#ff8c00', ma10:'#2f6fed', ma20:'#9c27b0', ma40:'#00a8a8',
+            dif:'#2f6fed', dea:'#ff8c00', hist:'#9c27b0', r14:'#2f6fed', r6:'#ff8c00' };
+
+function rsiSeries(closes, n){
+  const out = new Array(closes.length).fill(null);
+  for(let i=n;i<closes.length;i++){
+    let g=0,l=0;
+    for(let j=i-n+1;j<=i;j++){ const d=closes[j]-closes[j-1]; if(d>0)g+=d; else l+=-d; }
+    out[i] = l===0 ? 100 : 100-100/(1+g/l);
+  }
+  return out;
+}
+function last(arr){ return arr[arr.length-1]; }
+function fmt(n,p){ if(n==null) return '-'; return Number(n).toFixed(p||2); }
+function sign(v){ if(v==null) return '-'; return (v>0?'+':'') + v.toFixed(2); }
+
+const charts = {};
+function mk(id){ if(charts[id]) charts[id].dispose(); const c = echarts.init(document.getElementById(id)); charts[id]=c; return c; }
+
+/* K线 —— MA5/10/20/40 线条与指标值同色（HTML 浮层着色，绕开 ECharts title 限制） */
+function renderK(k){
+  const dates=k.map(x=>x.date);
+  const L=last(k);
+  document.getElementById('ivalK').innerHTML =
+    `<span style="color:${C.ma5}">MA5 ${fmt(L.ma5)}</span>&nbsp;&nbsp;`+
+    `<span style="color:${C.ma10}">MA10 ${fmt(L.ma10)}</span>&nbsp;&nbsp;`+
+    `<span style="color:${C.ma20}">MA20 ${fmt(L.ma20)}</span>&nbsp;&nbsp;`+
+    `<span style="color:${C.ma40}">MA40 ${fmt(L.ma40)}</span>`;
+  mk('chartK').setOption({
+    animation:false,
+    grid:{left:52,right:12,top:8,bottom:24},
+    xAxis:{type:'category',data:dates,axisLabel:{show:false}},
+    yAxis:{scale:true,splitLine:{lineStyle:{color:'#f0f0f0'}}},
+    tooltip:{trigger:'axis'},
+    series:[
+      {type:'candlestick',data:k.map(x=>[x.o,x.c,x.l,x.h]),
+       itemStyle:{color:UP,color0:DOWN,borderColor:UP,borderColor0:DOWN}},
+      {name:'MA5',type:'line',data:k.map(x=>x.ma5),smooth:true,showSymbol:false,lineStyle:{width:1,color:C.ma5}},
+      {name:'MA10',type:'line',data:k.map(x=>x.ma10),smooth:true,showSymbol:false,lineStyle:{width:1,color:C.ma10}},
+      {name:'MA20',type:'line',data:k.map(x=>x.ma20),smooth:true,showSymbol:false,lineStyle:{width:1.4,color:C.ma20}},
+      {name:'MA40',type:'line',data:k.map(x=>x.ma40),smooth:true,showSymbol:false,lineStyle:{width:1,type:'dashed',color:C.ma40}}
+    ]
+  });
+}
+
+/* MACD —— DIF/DEA 名字各一色；数值按正负红绿 */
+function renderMacd(k){
+  const L=last(k);
+  const col=v=>v>=0?UP:DOWN;
+  document.getElementById('ivalMacd').innerHTML =
+    `<span style="color:${C.dif}">DIF=${sign(L.dif)}</span>&nbsp;&nbsp;`+
+    `<span style="color:${C.dea}">DEA=${sign(L.dea)}</span>&nbsp;&nbsp;`+
+    `<span style="color:${col(L.hist)}">HIST=${sign(L.hist)}</span>`;
+  mk('chartMacd').setOption({
+    animation:false,
+    grid:{left:52,right:12,top:8,bottom:24},
+    xAxis:{type:'category',data:k.map(x=>x.date),axisLabel:{show:false}},
+    yAxis:{scale:true,splitLine:{lineStyle:{color:'#f0f0f0'}}},
+    tooltip:{trigger:'axis'},
+    series:[
+      {type:'bar',data:k.map(x=>x.hist),itemStyle:{color:p=>p.data>=0?UP:DOWN}},
+      {type:'line',data:k.map(x=>x.dif),showSymbol:false,lineStyle:{width:1,color:C.dif}},
+      {type:'line',data:k.map(x=>x.dea),showSymbol:false,lineStyle:{width:1,color:C.dea}}
+    ]
+  });
+}
+
+/* RSI —— RSI14 / RSI6 各一色 */
+function renderRsi(k){
+  const closes=k.map(x=>x.c);
+  const r14=rsiSeries(closes,14), r6=rsiSeries(closes,6);
+  const v14=last(r14), v6=last(r6);
+  document.getElementById('ivalRsi').innerHTML =
+    `<span style="color:${C.r14}">RSI14 ${fmt(v14,1)}</span>&nbsp;&nbsp;`+
+    `<span style="color:${C.r6}">RSI6 ${fmt(v6,1)}</span>`;
+  mk('chartRsi').setOption({
+    animation:false,
+    grid:{left:52,right:12,top:8,bottom:24},
+    xAxis:{type:'category',data:k.map(x=>x.date),axisLabel:{show:false}},
+    yAxis:{min:0,max:100,splitLine:{lineStyle:{color:'#f0f0f0'}}},
+    tooltip:{trigger:'axis'},
+    series:[
+      {type:'line',data:r14,showSymbol:false,lineStyle:{width:1.2,color:C.r14},name:'RSI14'},
+      {type:'line',data:r6,showSymbol:false,lineStyle:{width:1,type:'dashed',color:C.r6},name:'RSI6'},
+      {type:'line',markLine:{silent:true,symbol:'none',data:[{yAxis:50},{yAxis:80}],lineStyle:{color:'#bbb'}}}
+    ]
+  });
+}
+
+/* 信号明细 —— 驱动于 picks 序贯模型(seq)，非 analysis.py 七信号。
+   五条件映射：①=c1(周K) ②=c2(日K) ③=c3a(60分状态,③b为④当天事件) ④=c4(15分收敛) ⑤=c5(低位买点)
+   初期路径额外突出「第一个金叉买点」。 */
+function daysAgo(dateStr){
+  const d = new Date(dateStr); const now = new Date();
+  const diff = Math.floor((now - d) / 86400000);
+  return diff >= 0 ? `（距今日 ${diff} 日）` : '';
+}
+function renderSignals(ev, seq){
+  if(!seq){
+    document.getElementById('sigBody').innerHTML = '<div class="loading">序贯状态缺失（TDX 不可达）</div>';
+    return;
+  }
+  const trendMap = {main:'主升', early:'上涨初期', none:'周MA向下·不过闸'};
+  const trendKey = seq.trend_type || null;
+  const trendTxt = trendKey ? (trendMap[trendKey] || trendKey) : null;
+  const isEarly = trendKey === 'early';
+  const isMain = trendKey === 'main';
+  const c1 = !!seq.c1, c2 = !!seq.c2, c3a = !!seq.c3a, c3b = !!seq.c3b, c4 = !!seq.c4, c5 = !!seq.c5;
+  // ★入场过滤闸门：未提供 entry_ok（老数据）默认 True 不 gate；新版由 seq.entry_ok 透传
+  const entry_ok = (seq.entry_ok === undefined) ? true : !!seq.entry_ok;
+  const ma5r = (seq.entry_ma5_ratio != null) ? seq.entry_ma5_ratio : null;
+  const wkrsi = (seq.wk_rsi != null) ? seq.wk_rsi : '-';
+
+  const rows = [
+    { label:'① 周K', pass:c1,
+      yes: isEarly ? `周MA20>MA40且向上（初期①仅看排列，不卡RSI，周RSI=${wkrsi}）`
+                   : `周RSI=${wkrsi}>50 且 周MA20>MA40向上`,
+      no:  isEarly ? '周MA未呈多头排列'
+                   : `周RSI≤50 或 周MA未多头排列（周RSI=${wkrsi}）` },
+    { label:'② 日K', pass:c2,
+      yes: isEarly ? '日MA20刚金叉MA40+放量突破平台+RSI∈[45,65]'
+                   : 'close>MA20>MA40',
+      no:  isEarly ? '未满足「刚金叉+突破+RSI区间」'
+                   : 'close≤MA20 或 MA20≤MA40' },
+    { label:'③ 60分', pass:c3a,
+      yes: c3b ? 'MA20>MA40 且当日缩量回踩MA20✓'
+               : 'MA20>MA40（状态型；当日缩量回踩③b未触发）',
+      no:  '60分 MA20≤MA40（③a破→就绪清零）' },
+    { label:'④ 15分收敛', pass:c4,
+      yes: 'RSI∈[35,50]+缩量收敛✓',
+      no:  seq.c4_date ? `未触发，当前④就绪日 ${seq.c4_date}（剩余${seq.days_left ?? '-'}日）`
+                       : (seq.last_c4_date ? `未触发，最近④就绪日 ${seq.last_c4_date}` : '15分未触发') },
+    { label:'⑤ 低位买点', pass:c5,
+      yes: entry_ok
+              ? 'RSI∈[35,50]拐头/企稳✓，买点贴近MA5（有效上车）'
+              : `RSI∈[35,50]拐头/企稳✓，但价格远离MA5（+${ma5r}%）·追高剔除，等回踩至MA5附近再上`,
+      no:  '15分低位买点未确认' },
+  ];
+
+  let html = '';
+  if(trendTxt){
+    html += `<div class="sig-trend sig-trend-${trendKey}">路径判定：${trendTxt}</div>`;
+  }
+  // ★Part2：初期票突出第一个金叉买点（当前上升段第一根日MA20金叉MA40）
+  if(isEarly && seq.first_golden_date){
+    html += `<div class="sig-golden">⭐ 第一个金叉买点：${seq.first_golden_date} @ ${seq.first_golden_close}${daysAgo(seq.first_golden_date)}</div>`;
+  }
+  html += rows.map(r=>{
+    const cls = r.pass ? 'sig-pass' : 'sig-fail';
+    const mark = r.pass ? '✓' : '✗';
+    return `<div class="sig-row ${cls}"><span class="sig-label">${mark} ${r.label}</span><span class="sig-detail">${r.pass ? r.yes : r.no}</span></div>`;
+  }).join('');
+  document.getElementById('sigBody').innerHTML = html;
+}
+
+/* 入场点位预测（a=支撑/阻力价位区，b=背离参考；确定性计算非预测） */
+function renderEntry(d){
+  const e = (d.eval && d.eval.entry) || {support_resist:[],divergence:[]};
+  let html = '';
+  html += '<div style="margin:4px 0"><div style="font-weight:700;color:#2f6fed;margin-bottom:3px">支撑/阻力买点区</div>';
+  (e.support_resist||[]).forEach(x=>{
+    if(x.low!=null) html += `<div class="entry-line">· ${x.type}：<b>${x.low} ~ ${x.high}</b> <span class="entry-sub">（基准MA20=${x.ref}）</span></div>`;
+    else html += `<div class="entry-line">· ${x.type}：<b>${x.price}</b></div>`;
+  });
+  html += '</div>';
+  html += '<div style="margin:6px 0 2px"><div style="font-weight:700;color:#9c27b0;margin-bottom:3px">背离参考</div>';
+  (e.divergence||[]).forEach(x=>{
+    html += `<div class="entry-line">· ${x.type}：<b>${x.value}</b> <span class="entry-sub">— ${x.note}</span></div>`;
+  });
+  html += '</div>';
+  document.getElementById('entryBody').innerHTML = html || '<div class="loading">无数据</div>';
+}
+
+/* 风险复检（通栏） */
+function flagClass(f){ return f==='✅'?'ok':(f==='⚠️'?'warn':'bad'); }
+function renderRisk(risk){
+  const rows = risk.checks.filter(c=>!/权限|无权限/.test(c.label));
+  document.getElementById('riskBody').innerHTML =
+    `<table><thead><tr><th>检查项</th><th>结论</th><th>说明</th></tr></thead><tbody>`+
+    rows.map(c=>`<tr><td>${c.label}</td><td class="flag ${flagClass(c.flag)}">${c.flag}</td><td>${c.detail}</td></tr>`).join('')+
+    `</tbody></table>`;
+}
+
+/* 头部 */
+function renderHead(d){
+  document.getElementById('pvTitle').textContent = `${d.code} ${d.name}`;
+  const b=d.board, isMain=b.main_board;
+  const badge=document.getElementById('pvBadge');
+  badge.className='badge '+(isMain?'main':'dual');
+  badge.textContent = isMain ? '主板' : (b.board_name||'双创');
+  const e=d.eval;
+  document.getElementById('pvSub').textContent =
+    `级别:${e.level} | 综合分:${e.score} | 乖离:${e.extra?.bias??'-'}% | RSI:${e.extra?.rsi??'-'}`;
+  if(d.summary && d.summary.text){
+    document.getElementById('sumText').textContent = d.summary.text;
+    document.getElementById('sumText').classList.remove('sum-placeholder');
+  }
+}
+
+async function load(){
+  const params = new URLSearchParams(location.search);
+  const code = (params.get('code') || document.getElementById('pvCode').value || '').trim();
+  let market = params.get('market');
+  if(market === null || market === '' || isNaN(parseInt(market,10))){
+    market = /^[689]/.test(code) ? 1 : 0;
+  } else {
+    market = parseInt(market, 10);
+  }
+  const name = params.get('name') || '';
+  _pvCode = code; _pvMarket = market; _pvName = name;
+  document.getElementById('pvCode').value = code;
+  const sigBody = document.getElementById('sigBody');
+  sigBody.innerHTML='<div class="loading">加载中…</div>';
+  document.getElementById('sumText').textContent='（待确认内文 — 排版OK后填写）';
+  document.getElementById('sumText').classList.add('sum-placeholder');
+  if(!/^\d{6}$/.test(code)){
+    sigBody.innerHTML = '<div class="loading">请输入6位股票代码</div>';
+    renderHead({code: code||'-', name: '-', eval:{level:'-',score:'-',extra:{}}, board:{main_board:true}});
+    return;
+  }
+  try{
+    const r=await fetch(`/api/stock?code=${encodeURIComponent(code)}&market=${market}&name=${encodeURIComponent(name)}`);
+    const d=await r.json();
+    if(!r.ok || d.error){
+      sigBody.innerHTML = `<div class="loading">加载失败：${esc(d.error || ('HTTP '+r.status))}</div>`;
+      renderHead({code: code, name: name||'-', eval:{level:'-',score:'-',extra:{}}, board:{main_board:true}});
+      return;
+    }
+    // 兼容直接打开无 name 的情况：从返回数据里兜底
+    if(!d.name && d.seq && d.seq.name) d.name = d.seq.name;
+    if(!d.name && d.eval && d.eval.name) d.name = d.eval.name;
+    if(!d.code) d.code = code;
+    if(d.name) _pvName = d.name;
+    renderHead(d);
+    pvLoadHoldings();
+    renderK(d.kdata); renderMacd(d.kdata); renderRsi(d.kdata);
+    renderEntry(d); renderSignals(d.eval, d.seq); renderRisk(d.risk);
+    if(d && d.llm_pending){ startStockFill(code, market, d); }
+  }catch(e){
+    sigBody.innerHTML = `<div class="loading">加载异常：${esc(e.message)}</div>`;
+    renderHead({code: code, name: name||'-', eval:{level:'-',score:'-',extra:{}}, board:{main_board:true}});
+  }
+}
+document.getElementById('pvGo').onclick=load;
+load();
+window.addEventListener('resize',()=>Object.values(charts).forEach(c=>c.resize()));
+
+/* —— 单票 LLM 异步补填：首屏骨架秒出，后台 LLM 算完前端轮询填入 —— */
+let _stockFillTimer = null;
+function startStockFill(code, market, d){
+  if(_stockFillTimer) clearInterval(_stockFillTimer);
+  const sumEl = document.getElementById('sumText');
+  if(sumEl){ sumEl.textContent = '（AI 解读生成中…）'; sumEl.classList.add('sum-placeholder'); }
+  let tries = 0;
+  _stockFillTimer = setInterval(async ()=>{
+    tries++;
+    try{
+      const r = await fetch(`/api/stock_fill?code=${encodeURIComponent(code)}&market=${market}`);
+      const f = await r.json();
+      if(f && f.ready){
+        clearInterval(_stockFillTimer); _stockFillTimer = null;
+        if(sumEl && f.summary_text){ sumEl.textContent = f.summary_text; sumEl.classList.remove('sum-placeholder'); }
+        if(d && d.risk && Array.isArray(d.risk.checks)){
+          const nc = d.risk.checks.find(c=>c.key==='news');
+          if(nc && f.news_detail!=null){ nc.detail = f.news_detail; nc.ai_summary = f.news_ai; renderRisk(d.risk); }
+        }
+      }
+    }catch(e){}
+    if(tries>=40 && _stockFillTimer){ clearInterval(_stockFillTimer); _stockFillTimer = null; }
+  }, 2000);
+}
+</script>
+</body>
+</html>

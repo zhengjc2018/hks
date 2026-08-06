@@ -1,0 +1,15 @@
+{
+  "llm": {
+    "enabled": false,
+    "endpoint": "",
+    "api_key": "",
+    "model": ""
+  },
+  "issue_form_url": "https://docs.qq.com/form/page/DY3ZIc1RWR0tjTWxJ",
+  "news": {
+    "enabled": true,
+    "provider": "cninfo",
+    "limit_days": 30,
+    "neg_keywords": ["减持", "退市", "立案", "业绩预减", "商誉减值", "重大诉讼", "问询函", "警示函", "终止上市", "预亏", "业绩变脸", "被ST"]
+  }
+}
