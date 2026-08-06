@@ -57,7 +57,7 @@ val copyPythonSources = tasks.register<Copy>("copyPythonSources") {
     into(layout.projectDirectory.dir("src/main/python"))
 }
 
-tasks.matching { it.name.endsWith("PythonSources") }.configureEach {
+tasks.matching { it.name.startsWith("merge") && it.name.endsWith("PythonSources") }.configureEach {
     dependsOn(copyPythonSources)
 }
 
