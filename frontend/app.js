@@ -1001,27 +1001,48 @@ function hideStockHist(now){ if(stockHistTimer){ clearTimeout(stockHistTimer); }
 async function doSearchStock(){
   const val = ($('stockSearchInput').value||'').trim();
   if(!val){ alert('请输入股票代码或名称'); return; }
+  const btn = $('btnSearchStock');
+  const oldText = btn ? btn.textContent : '';
+  if(btn){ btn.disabled = true; btn.textContent = '查询中…'; }
   try {
-    const data = _picksCache || await _loadPicksData();
-    const all = [].concat(data.full_match||[], data.pool||[], data.seq8_candidates||[], data.seq8_triggers||[]);
     const q = val.toLowerCase();
+
+    // 6 位代码直接实时查询，不依赖 picks 全市场扫描缓存
+    if(/^\d{6}$/.test(q)){
+      const d = await api('/api/stock_seq', {method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({q: val}), timeout: 30000});
+      if(d.row){
+        addStockHist(d.row.secid, d.row.name);
+        focusStock(d.row.secid, d.row.name);
+        return;
+      }
+      if(d.error){ alert('查询失败：'+d.error); return; }
+      alert('未找到符合条件的结果');
+      return;
+    }
+
+    const data = _picksCache || await _loadPicksData();
+    const all = data ? [].concat(data.full_match||[], data.pool||[], data.seq8_candidates||[], data.seq8_triggers||[]) : [];
     const hits = all.filter(r => (r.secid && r.secid.toLowerCase().includes(q)) || (r.name && r.name.toLowerCase().includes(q)));
     if(hits.length){
       addStockHist(hits[0].secid, hits[0].name);
-      focusStock(hits[0].secid, hits[0].name);   // ★改：弹页面内个股详情弹窗，而非区3表格
+      focusStock(hits[0].secid, hits[0].name);
       return;
     }
-    // 缓存未命中 → 实时查单票（解析代码/名称 → scan_stock）
+
+    // 名称查询缓存未命中 → 实时查单票
     const d = await api('/api/stock_seq', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({q: val}), timeout: 30000});
     if(d.row){
       addStockHist(d.row.secid, d.row.name);
-      focusStock(d.row.secid, d.row.name);       // ★改：弹页面内弹窗
+      focusStock(d.row.secid, d.row.name);
       return;
     }
     if(d.error){ alert('查询失败：'+d.error); return; }
     alert('未找到符合条件的结果');
   } catch(e){
     alert('查询失败：'+e.message);
+  } finally {
+    if(btn){ btn.disabled = false; btn.textContent = oldText; }
   }
 }
 

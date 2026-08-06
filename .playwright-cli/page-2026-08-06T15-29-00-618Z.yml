@@ -1,0 +1,269 @@
+- generic [active] [ref=e1]:
+  - banner [ref=e2]:
+    - heading "A股机会雷达 · 多周期共振工作台" [level=1] [ref=e3]
+    - generic [ref=e4]: "--"
+    - generic [ref=e5]:
+      - textbox "代码查买点 600519" [ref=e7] [cursor=pointer]
+      - button "查买点" [ref=e8] [cursor=pointer]
+      - button "我的持仓" [ref=e9] [cursor=pointer]
+      - button "⚙ 设置" [ref=e10] [cursor=pointer]
+      - button "📝 上报问题" [ref=e11] [cursor=pointer]
+      - button "🌙 夜间" [ref=e12] [cursor=pointer]
+      - combobox [ref=e13] [cursor=pointer]:
+        - option "15s" [selected]
+        - option "10s"
+        - option "30s"
+      - button "暂停" [ref=e14] [cursor=pointer]
+      - generic [ref=e15]: "--"
+  - generic [ref=e16]:
+    - heading "大盘定调 加载中..." [level=2] [ref=e18]:
+      - text: 大盘定调
+      - generic [ref=e19]: 加载中...
+    - generic [ref=e21]:
+      - heading "机会板块矩阵 首屏展示 24 个，其余折叠；点击卡片加载该板块个股买点；卡片左侧色带=资金流向（红=净流入/绿=净流出，越深占比越高）" [level=2] [ref=e22]:
+        - text: 机会板块矩阵
+        - generic [ref=e23]: 首屏展示 24 个，其余折叠；点击卡片加载该板块个股买点；卡片左侧色带=资金流向（红=净流入/绿=净流出，越深占比越高）
+      - generic [ref=e24]:
+        - generic [ref=e25]: 战略叠加层 · 当前 Regime：neutral
+        - generic [ref=e26]: LLM简评后台生成中…
+        - button "战略叠加：开" [ref=e27] [cursor=pointer]
+        - generic [ref=e28]: 覆盖 128 个板块 · 观察池 5 支
+        - generic [ref=e29]: 模拟总览——主线轮动，控制仓位13:30档（生成中…）
+      - textbox "搜索板块名，点击结果添加/取消关注 ★" [ref=e31]
+      - generic [ref=e32]:
+        - generic [ref=e33] [cursor=pointer]:
+          - generic [ref=e34]: 主推
+          - generic [ref=e35]: 焦炭加工
+          - generic [ref=e36]: +2.15%
+          - generic [ref=e37]: 主力净流入1.19亿
+          - generic [ref=e38]: 周K未主升，今日+2.15%，反弹持续性待观察，无明显龙头带动，资金净流入支撑
+        - generic [ref=e39] [cursor=pointer]:
+          - generic [ref=e40]: 主推
+          - generic [ref=e41]: 煤炭开采
+          - generic [ref=e42]: +4.37%
+          - generic [ref=e43]: 主力净流入11.13亿
+          - generic [ref=e44]: 周K未主升，今日+4.37%，反弹持续性待观察，无明显龙头带动，资金净流入支撑
+        - generic [ref=e45] [cursor=pointer]:
+          - generic [ref=e46]: 主推
+          - generic [ref=e47]: 非金属材料
+          - generic [ref=e48]: +2.87%
+          - generic [ref=e49]: 主力净流入3.52亿
+          - generic [ref=e50]: 周K未主升，今日+2.87%，反弹持续性待观察，无明显龙头带动，资金净流入支撑
+        - generic [ref=e51] [cursor=pointer]:
+          - generic [ref=e52]: 主推
+          - generic [ref=e53]: 种植业
+          - generic [ref=e54]: +2.09%
+          - generic [ref=e55]: 主力净流入2.75亿
+          - generic [ref=e56]: 周K未主升，今日+2.09%，反弹持续性待观察，无明显龙头带动，资金净流入支撑
+        - generic [ref=e57] [cursor=pointer]:
+          - generic [ref=e58]: 主推
+          - generic [ref=e59]: 橡胶
+          - generic [ref=e60]: +2.99%
+          - generic [ref=e61]: 主力净流入1.62亿
+          - generic [ref=e62]: 周K未主升，今日+2.99%，反弹持续性待观察，无明显龙头带动，资金净流入支撑
+        - generic [ref=e63] [cursor=pointer]:
+          - generic [ref=e64]: 主推
+          - generic [ref=e65]: 电子化学品
+          - generic [ref=e66]: +4.83%
+          - generic [ref=e67]: 主力净流入16.04亿
+          - generic [ref=e68]: 周K未主升，今日+4.83%，反弹持续性待观察，无明显龙头带动，资金净流入支撑
+        - generic [ref=e69] [cursor=pointer]:
+          - generic [ref=e70]: 主推
+          - generic [ref=e71]: 元器件
+          - generic [ref=e72]: +2.49%
+          - generic [ref=e73]: 主力净流入14.59亿
+          - generic [ref=e74]: 周K未主升，今日+2.49%，反弹持续性待观察，无明显龙头带动，资金净流入支撑
+        - generic [ref=e75] [cursor=pointer]:
+          - generic [ref=e76]: 观察
+          - generic [ref=e77]: 农产品加工
+          - generic [ref=e78]: +1.58%
+          - generic [ref=e79]: 主力净流入1.39亿
+          - generic [ref=e80]: 周K未主升，今日+1.58%，反弹持续性待观察，无明显龙头带动，资金净流入支撑
+        - generic [ref=e81] [cursor=pointer]:
+          - generic [ref=e82]: 观察
+          - generic [ref=e83]: 航海装备
+          - generic [ref=e84]: +0.03%
+          - generic [ref=e85]: 主力净流出4.81亿
+          - generic [ref=e86]: 周K未主升，今日+0.03%，反弹持续性待观察，无明显龙头带动，资金流出承压
+        - generic [ref=e87] [cursor=pointer]:
+          - generic [ref=e88]: 观察
+          - generic [ref=e89]: 渔业
+          - generic [ref=e90]: +0.97%
+          - generic [ref=e91]: 主力净流入0.25亿
+          - generic [ref=e92]: 周K未主升，今日+0.97%，反弹持续性待观察，无明显龙头带动，资金净流入支撑
+        - generic [ref=e93] [cursor=pointer]:
+          - generic [ref=e94]: 观察
+          - generic [ref=e95]: 水泥
+          - generic [ref=e96]: +1.77%
+          - generic [ref=e97]: 主力净流入1.58亿
+          - generic [ref=e98]: 周K未主升，今日+1.77%，反弹持续性待观察，无明显龙头带动，资金净流入支撑
+        - generic [ref=e99] [cursor=pointer]:
+          - generic [ref=e100]: 观察
+          - generic [ref=e101]: 医药商业
+          - generic [ref=e102]: +0.03%
+          - generic [ref=e103]: 主力净流入3.10亿
+          - generic [ref=e104]: 周K未主升，今日+0.03%，反弹持续性待观察，无明显龙头带动，资金净流入支撑
+        - generic [ref=e105] [cursor=pointer]:
+          - generic [ref=e106]: 观察
+          - generic [ref=e107]: 油气开采
+          - generic [ref=e108]: +0.52%
+          - generic [ref=e109]: 主力净流出1.41亿
+          - generic [ref=e110]: 周K未主升，今日+0.52%，反弹持续性待观察，无明显龙头带动，资金流出承压
+        - generic [ref=e111] [cursor=pointer]:
+          - generic [ref=e112]: 观察
+          - generic [ref=e113]: 石油化工
+          - generic [ref=e114]: +1.87%
+          - generic [ref=e115]: 主力净流入1.37亿
+          - generic [ref=e116]: 周K未主升，今日+1.87%，反弹持续性待观察，无明显龙头带动，资金净流入支撑
+        - generic [ref=e117] [cursor=pointer]:
+          - generic [ref=e118]: 观察
+          - generic [ref=e119]: 装饰建材
+          - generic [ref=e120]: +0.10%
+          - generic [ref=e121]: 主力净流出1.31亿
+          - generic [ref=e122]: 周K未主升，今日+0.10%，反弹持续性待观察，无明显龙头带动，资金流出承压
+        - generic [ref=e123] [cursor=pointer]:
+          - generic [ref=e124]: 观察
+          - generic [ref=e125]: 饲料
+          - generic [ref=e126]: +0.18%
+          - generic [ref=e127]: 主力净流出0.68亿
+          - generic [ref=e128]: 周K未主升，今日+0.18%，反弹持续性待观察，无明显龙头带动，资金流出承压
+        - generic [ref=e129] [cursor=pointer]:
+          - generic [ref=e130]: 观察
+          - generic [ref=e131]: 专业工程
+          - generic [ref=e132]: +0.06%
+          - generic [ref=e133]: 主力净流出2.01亿
+          - generic [ref=e134]: 周K未主升，今日+0.06%，反弹持续性待观察，无明显龙头带动，资金流出承压
+        - generic [ref=e135] [cursor=pointer]:
+          - generic [ref=e136]: 观察
+          - generic [ref=e137]: 电信服务
+          - generic [ref=e138]: +0.91%
+          - generic [ref=e139]: 主力净流入1.24亿
+          - generic [ref=e140]: 周K未主升，今日+0.91%，反弹持续性待观察，无明显龙头带动，资金净流入支撑
+        - generic [ref=e141] [cursor=pointer]:
+          - generic [ref=e142]: 观察
+          - generic [ref=e143]: 化学制品
+          - generic [ref=e144]: +1.97%
+          - generic [ref=e145]: 主力净流入10.11亿
+          - generic [ref=e146]: 周K未主升，今日+1.97%，反弹持续性待观察，无明显龙头带动，资金净流入支撑
+        - generic [ref=e147] [cursor=pointer]:
+          - generic [ref=e148]: 观察
+          - generic [ref=e149]: 工业金属
+          - generic [ref=e150]: +0.20%
+          - generic [ref=e151]: 主力净流出15.31亿
+          - generic [ref=e152]: 周K未主升，今日+0.20%，反弹持续性待观察，无明显龙头带动，资金流出承压
+        - generic [ref=e153] [cursor=pointer]:
+          - generic [ref=e154]: 观察
+          - generic [ref=e155]: 林业
+          - generic [ref=e156]: +0.75%
+          - generic [ref=e157]: 主力净流出0.24亿
+          - generic [ref=e158]: 周K未主升，今日+0.75%，反弹持续性待观察，无明显龙头带动，资金流出承压
+        - generic [ref=e159] [cursor=pointer]:
+          - generic [ref=e160]: 观察
+          - generic [ref=e161]: 金属新材料
+          - generic [ref=e162]: +0.86%
+          - generic [ref=e163]: 主力净流入2.03亿
+          - generic [ref=e164]: 周K未主升，今日+0.86%，反弹持续性待观察，无明显龙头带动，资金净流入支撑
+        - generic [ref=e165] [cursor=pointer]:
+          - generic [ref=e166]: 观察
+          - generic [ref=e167]: 服装家纺
+          - generic [ref=e168]: +0.67%
+          - generic [ref=e169]: 主力净流出1.06亿
+          - generic [ref=e170]: 周K未主升，今日+0.67%，反弹持续性待观察，无明显龙头带动，资金流出承压
+        - generic [ref=e171] [cursor=pointer]:
+          - generic [ref=e172]: 观察
+          - generic [ref=e173]: 动物保健
+          - generic [ref=e174]: +0.01%
+          - generic [ref=e175]: 主力净流出0.14亿
+          - generic [ref=e176]: 周K未主升，今日+0.01%，反弹持续性待观察，无明显龙头带动，资金流出承压
+      - button "加载更多板块 ▼" [ref=e178] [cursor=pointer]
+    - generic [ref=e179]:
+      - heading "个股买点 点击上方板块加载该板块内个股（未选板块时不显示）" [level=2] [ref=e180]:
+        - text: 个股买点
+        - generic [ref=e181]: 点击上方板块加载该板块内个股（未选板块时不显示）
+      - generic [ref=e182]: 点击上方任意板块卡片，下方加载该板块内符合多周期共振的个股买点 →
+    - generic [ref=e184]:
+      - heading "个股生命周期 · 状态机漏斗 观察池(通道A自动灌入·按tier排序) → 待上车（按板块权重排列）；持仓移至右上「我的持仓」独立页" [level=2] [ref=e185]:
+        - text: 个股生命周期 · 状态机漏斗
+        - generic [ref=e186]: 观察池(通道A自动灌入·按tier排序) → 待上车（按板块权重排列）；持仓移至右上「我的持仓」独立页
+      - generic [ref=e187]:
+        - heading "② 待上车 1 ④已就绪且⑤触发 / 当日直接合并命中 · 按板块权重降序" [level=3] [ref=e188]:
+          - text: ② 待上车
+          - generic [ref=e189]: "1"
+          - generic [ref=e190]: ④已就绪且⑤触发 / 当日直接合并命中 · 按板块权重降序
+        - generic [ref=e192]:
+          - generic [ref=e193]:
+            - generic [ref=e194]: 油服工程
+            - generic [ref=e195]: 权重 0.0
+            - generic [ref=e196]: 1 支
+          - generic [ref=e198] [cursor=pointer]:
+            - generic [ref=e199]:
+              - generic [ref=e200]: ☆
+              - text: 博迈科
+              - generic [ref=e201]: "603727"
+              - generic [ref=e202]: A
+              - generic [ref=e203]: 主升
+            - text: T3
+            - generic [ref=e204]: ①②③⑤④ 命中
+            - generic [ref=e205]:
+              - button "确认上车" [ref=e206]
+              - button "移出" [ref=e207]
+      - generic [ref=e208]:
+        - heading "① 观察池 5 通道A自动灌入 · 按 tier 排序" [level=3] [ref=e209]:
+          - text: ① 观察池
+          - generic [ref=e210]: "5"
+          - generic [ref=e211]: 通道A自动灌入 · 按 tier 排序
+        - generic [ref=e212]:
+          - generic [ref=e213]: 头部关注 · T1 / T2
+          - generic [ref=e216]:
+            - generic [ref=e217] [cursor=pointer]:
+              - generic [ref=e218]:
+                - generic [ref=e219]: ☆
+                - text: 赛分科技
+                - generic [ref=e220]: "688758"
+                - generic [ref=e221]: 科
+                - generic [ref=e222]: A
+                - generic [ref=e223]: 主升
+              - text: T2
+              - generic [ref=e224]: ①②③④ 命中
+              - button "固定观察池显示" [ref=e226]
+            - generic [ref=e227] [cursor=pointer]:
+              - generic [ref=e228]:
+                - generic [ref=e229]: ☆
+                - text: 首华燃气
+                - generic [ref=e230]: "300483"
+                - generic [ref=e231]: 创
+                - generic [ref=e232]: A
+                - generic [ref=e233]: 主升
+              - text: T2
+              - generic [ref=e234]: ①②③ 命中
+              - button "固定观察池显示" [ref=e236]
+            - generic [ref=e237] [cursor=pointer]:
+              - generic [ref=e238]:
+                - generic [ref=e239]: ☆
+                - text: 山煤国际
+                - generic [ref=e240]: "600546"
+                - generic [ref=e241]: A
+                - generic [ref=e242]: 主升
+              - text: T2
+              - generic [ref=e243]: ①②③ 命中
+              - button "固定观察池显示" [ref=e245]
+            - generic [ref=e246] [cursor=pointer]:
+              - generic [ref=e247]:
+                - generic [ref=e248]: ☆
+                - text: 景旺电子
+                - generic [ref=e249]: "603228"
+                - generic [ref=e250]: A
+                - generic [ref=e251]: 主升
+              - text: T2
+              - generic [ref=e252]: ①②③ 命中
+              - button "固定观察池显示" [ref=e254]
+            - generic [ref=e255] [cursor=pointer]:
+              - generic [ref=e256]:
+                - generic [ref=e257]: ☆
+                - text: 金诚信
+                - generic [ref=e258]: "603979"
+                - generic [ref=e259]: A
+                - generic [ref=e260]: 主升
+              - text: T2
+              - generic [ref=e261]: ①②③ 命中
+              - button "固定观察池显示" [ref=e263]
