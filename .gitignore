@@ -3,6 +3,7 @@ __pycache__/
 *.py[cod]
 *.log
 *.apk
+.playwright-cli/
 
 # local Python environment
 .venv/
