@@ -38,6 +38,11 @@ docker run -p 8000:8000 hks
 注意：后台调度器只在单个 gunicorn worker 内启动，`Dockerfile` 已固定
 `--workers 1`，不要自行调大 worker 数。
 
+**Render 免费部署（推荐）**：仓库里已带 `render.yaml`，把
+`https://github.com/zhengjc2018/hks` 导入 Render 后会自动识别并部署。
+部署完成后会得到一个 `https://hks.onrender.com/` 形式的地址，把这个地址填进
+安卓 App 的后端地址即可，手机不需要再依赖本地电脑。
+
 ## 三、安卓 App
 
 构建产物为项目根目录下的 `A股机会雷达-debug.apk`，可直接传到安卓手机安装。

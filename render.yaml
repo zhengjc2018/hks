@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: hks
+    runtime: docker
+    repo: https://github.com/zhengjc2018/hks
+    plan: free
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/health
+    envVars:
+      - key: APANEL_LLM_MOCK
+        value: "1"
+      - key: PORT
+        value: "8000"
