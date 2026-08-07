@@ -206,6 +206,20 @@
   .modal input[type=number],.modal select{font:inherit;padding:5px 8px;border:1px solid var(--line);border-radius:6px;background:var(--card);color:var(--text)}
   .modal .chk{display:inline-flex;align-items:center;gap:5px;margin-right:16px;font-size:13px;color:var(--text);cursor:pointer}
   .modal button.primary{background:var(--ok);color:#fff;border:1px solid var(--ok);padding:6px 18px;border-radius:6px;cursor:pointer;font:inherit}
+  /* 消息通知（仿微信气泡，右上角堆叠） */
+  .notify-stack{position:fixed;top:64px;right:14px;z-index:120;display:flex;flex-direction:column;gap:10px;width:320px;max-width:calc(100vw - 28px);pointer-events:none}
+  .notify-card{pointer-events:auto;background:#fff;border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:10px;padding:10px 12px;box-shadow:0 8px 24px rgba(0,0,0,.16);cursor:pointer;animation:notifyIn .25s ease-out;color:var(--text)}
+  .notify-card.t-signal{border-left-color:#e8590c}
+  .notify-card.ready{border-left-color:var(--ok)}
+  .notify-card .notify-title{font-size:12px;color:var(--sub);margin-bottom:4px;display:flex;justify-content:space-between;gap:10px}
+  .notify-card .notify-body{font-size:13px;font-weight:600;line-height:1.45}
+  .notify-card .notify-sub{font-size:12px;color:var(--sub);margin-top:3px;line-height:1.4}
+  .notify-card .notify-close{font-size:15px;line-height:1;cursor:pointer;color:var(--sub);padding:0 2px}
+  .notify-card:hover{background:#f7f9fc}
+  [data-theme="dark"] .notify-card{background:#1f2631;border-color:#2a3140}
+  [data-theme="dark"] .notify-card:hover{background:#242c3a}
+  @keyframes notifyIn{from{opacity:0;transform:translateX(24px)}to{opacity:1;transform:none}}
+  .notify-card.out{opacity:0;transform:translateX(24px);transition:opacity .2s, transform .2s}
   /* 个股详情页内弹窗（iframe 复用 /preview） */
   .preview-modal{width:min(980px,96vw);max-height:92vh;padding:0;overflow:hidden}
   .preview-modal .close{position:absolute;top:6px;right:14px;z-index:3;font-size:22px}

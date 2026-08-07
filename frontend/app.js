@@ -17,6 +17,10 @@ let paused = false;
 let refreshTimer = null;
 let loadingCount = 0;   // 必须在 loadAll() 调用前声明（防 TDZ 崩溃）
 let _tScanning = false; // 做T扫描防重入（一轮扫描可能持续数秒）
+let _knownReadyStocks = new Set();
+let _knownTSignals = new Set();
+let _readyNotifiedBaseline = false;
+let _tsignalNotifiedBaseline = false;
 // regime 蓝框内摘要（覆盖板块数 / 战略关注 / 观察池支数）
 let _sectorTotal = 0, _overlayFavor = 0, _watchTotal = 0;
 // 持仓星标缓存：key=code|market，value={code,market,name}
@@ -782,7 +786,9 @@ function renderPickRows(rows, boardName){
 async function loadLifecycle(){
   try {
     const d = await api('/api/lifecycle');
+    const groups = (d && d.groups) || {};
     renderPipeline(d);
+    notifyReadyChanges(groups.ready || []);
   } catch(e) {
     console.warn('生命周期数据加载失败:', e);
   }
@@ -1193,6 +1199,7 @@ async function scanTTrade(){
       body: JSON.stringify(body), timeout: 120000
     });
     renderTTrade(d);
+    notifyTSignalChanges(d.items);
     if(msg){
       const n = (d.items||[]).reduce((a,it)=>a+(it.signals||[]).length,0);
       msg.textContent = d.note || ('完成：' + (d.items||[]).length + ' 只 / ' + n + ' 个信号');
@@ -1202,6 +1209,76 @@ async function scanTTrade(){
   } finally {
     _tScanning = false;
   }
+}
+
+/* ---------- 消息通知（新做T信号 / 新待上车） ---------- */
+function notifyPopup(title, body, sub, kind, secid, name){
+  let stack = $('notifyStack');
+  if(!stack){
+    stack = document.createElement('div');
+    stack.id = 'notifyStack';
+    stack.className = 'notify-stack';
+    document.body.appendChild(stack);
+  }
+  while(stack.children.length >= 4) stack.removeChild(stack.firstChild);
+
+  const card = document.createElement('div');
+  card.className = 'notify-card ' + (kind === 'ready' ? 'ready' : 't-signal');
+  card.innerHTML = `<div class="notify-title"><span>${esc(title)}</span><span class="notify-close" title="关闭">×</span></div>` +
+    `<div class="notify-body">${esc(body)}</div>` +
+    (sub ? `<div class="notify-sub">${esc(sub)}</div>` : '');
+  const dismiss = () => {
+    if(card.classList.contains('out')) return;
+    card.classList.add('out');
+    setTimeout(() => { if(card.parentNode) card.parentNode.removeChild(card); }, 220);
+  };
+  card.querySelector('.notify-close').addEventListener('click', e => {
+    e.stopPropagation();
+    dismiss();
+  });
+  card.addEventListener('click', () => {
+    if(secid && /^[01]\.\d{6}$/.test(secid) && name) focusStock(secid, name);
+    dismiss();
+  });
+  stack.appendChild(card);
+  setTimeout(dismiss, 8000);
+}
+function notifyReadyChanges(ready){
+  if(!_readyNotifiedBaseline){
+    _readyNotifiedBaseline = true;
+    (ready || []).forEach(item => { if(item.secid) _knownReadyStocks.add(item.secid); });
+    return;
+  }
+  (ready || []).forEach(item => {
+    if(!item.secid || _knownReadyStocks.has(item.secid)) return;
+    _knownReadyStocks.add(item.secid);
+    const code = (item.secid || '').split('.')[1] || '';
+    notifyPopup('待上车', (item.name || code || item.secid) + (code ? ' ' + code : ''),
+      '⑤触发 · ' + (item.sector || '个股待上车'), 'ready', item.secid, item.name);
+  });
+}
+function notifyTSignalChanges(items){
+  const signals = [];
+  (items || []).forEach(it => {
+    (it.signals || []).forEach(s => {
+      signals.push({
+        key: [it.secid, s.signal_type, s.signal_name || ''].join('|'),
+        it, s,
+      });
+    });
+  });
+  if(!_tsignalNotifiedBaseline){
+    _tsignalNotifiedBaseline = true;
+    signals.forEach(x => _knownTSignals.add(x.key));
+    return;
+  }
+  signals.forEach(({key, it, s}) => {
+    if(_knownTSignals.has(key)) return;
+    _knownTSignals.add(key);
+    const dir = s.signal_type === 'buy' ? '低吸' : (s.signal_type === 'sell' ? '高抛' : '止损');
+    const sub = [dir, s.signal_name, s.reason].filter(Boolean).join(' · ');
+    notifyPopup('新做T信号', (it.name || it.code) + ' ' + it.code, sub, 't-signal', it.secid, it.name);
+  });
 }
 function tStrengthTxt(s){
   return {weak:'弱', medium:'中', strong:'强'}[s] || s || '-';
