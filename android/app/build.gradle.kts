@@ -54,6 +54,9 @@ val copyPythonSources = tasks.register<Copy>("copyPythonSources") {
         include("config.example.json")
         exclude("wsgi.py")
     }
+    from(rootProject.file("seed")) {
+        include("**")
+    }
     into(layout.projectDirectory.dir("src/main/python"))
 }
 

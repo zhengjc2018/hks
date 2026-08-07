@@ -29,7 +29,7 @@ jobs:
           pyinstaller --noconfirm --clean --onefile --name "A股机会雷达" `
             --add-data "frontend;frontend" `
             --add-data "config.example.json;." `
-            --add-data "android/app/src/main/python/seed;seed" `
+            --add-data "seed;seed" `
             --collect-all easy_tdx `
             exe_launcher.py
 

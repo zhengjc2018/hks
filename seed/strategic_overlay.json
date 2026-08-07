@@ -1,0 +1,10 @@
+{
+  "meta": {
+    "valid_from": "2026-08-06",
+    "valid_until": "2026-12-31",
+    "regime": "neutral",
+    "note": "分发版中性叠加层：无战略倾向，纯技术门控。填入你自己的大模型 endpoint 并开启 strategic_overlay_enabled 后，由每周《战略预见备忘录》更新 avoid/favor。"
+  },
+  "avoid": [],
+  "favor": []
+}
