@@ -57,7 +57,7 @@ fi
 mkdir -p logs
 export APANEL_PORT="$PORT"
 export APANEL_HOST="127.0.0.1"
-export APANEL_LLM_MOCK=1
+export APANEL_LLM_MOCK=0
 nohup "$PY" server.py > logs/server.log 2>&1 &
 echo $! > logs/server.pid
 

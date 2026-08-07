@@ -67,7 +67,7 @@
   .sec{border:1px solid var(--line);border-radius:8px;padding:10px 12px;cursor:pointer;transition:.15s;position:relative;background:var(--card);display:flex;flex-direction:column;overflow:hidden}
   .sec:hover{box-shadow:0 2px 10px rgba(0,0,0,.08)}
   .sec.main{border-color:var(--ok);box-shadow:0 0 0 1px var(--ok) inset}
-  .sec .nm{font-weight:600;font-size:14px;padding-right:70px;min-height:20px}
+  .sec .nm{font-weight:600;font-size:14px;padding:0 70px 0 20px;min-height:20px}
   .sec .pc{font-size:15px;font-weight:700;margin-top:4px}
   .sec .net{color:var(--sub);font-size:12px;margin-top:2px}
   .sec .st{position:absolute;top:8px;right:8px;font-size:11px;padding:1px 6px;border-radius:4px;background:#eef1f6;color:var(--sub);z-index:2}
@@ -83,7 +83,9 @@
   .sec.flow-out-2{border-left:4px solid #2E7D32}
   .sec.flow-out-3{border-left:4px solid #7BC47F}
   .sec.flow-out-4{border-left:4px solid #E7FDE8}
-  .sec .star{position:absolute;top:7px;left:9px;font-size:12px;color:#d9b400}
+  .sec .star{position:absolute;top:7px;left:9px;font-size:14px;line-height:1;color:#f59e0b;cursor:pointer;z-index:3;padding:2px;border-radius:6px;transition:transform .12s,color .12s}
+  .sec .star.off{color:#b6becd}
+  .sec .star:hover{transform:scale(1.22);color:#f59e0b}
   /* 战略关注 / 战略回避 两种角标（浅色）：绝对定位在右上角 state 标签下方，避免遮挡 */
   .sec .flag-favor{background:#e8f6f1;color:var(--ok);border:1px solid #b6e3cb}
   .sec .flag-avoid{background:#fdecec;color:#c0392b;border:1px solid #f3b5b5}
@@ -154,6 +156,8 @@
   .lc-trend{font-size:10px;padding:0 5px;border-radius:4px;font-weight:700}
   .lc-trend.main{background:#fdecea;color:#e0413e}
   .lc-trend.early{background:#eafaf0;color:#1a9e5a}
+  .lc-sector{font-size:10px;padding:0 5px;border-radius:4px;font-weight:700;background:#eef4ff;color:var(--accent);white-space:nowrap}
+  .lc-price{font-weight:600;color:var(--text)}
   /* ★E：双创标签（方块） */
   .tag-kc, .tag-cy{display:inline-block;font-size:10px;line-height:1;font-weight:700;padding:2px 4px;border-radius:3px;vertical-align:middle}
   .tag-kc{background:#fdecec;color:#c0392b;border:1px solid #f5c6c6}
@@ -167,6 +171,15 @@
   .lc-actions button.primary{background:var(--ok);color:#fff;border-color:var(--ok)}
   .lc-actions button.danger{background:#fdecec;color:#c0392b;border-color:#f3b5b5}
 .lc-actions button.ghost{color:var(--sub)}
+  /* 做T信号 */
+  .t-toolbar{display:flex;align-items:center;gap:10px;margin:-2px 0 12px;flex-wrap:wrap}
+  .t-toolbar .sec-search{width:220px}
+  .t-sig{font-size:11px;padding:2px 8px;border-radius:5px;font-weight:700;white-space:nowrap}
+  .t-sig.buy{background:#eafaf1;color:#1a9e5a}
+  .t-sig.sell{background:#fdecea;color:#e0413e}
+  .t-sig.stop{background:#fdecec;color:#c0392b}
+  .t-state{font-size:11px;color:var(--sub);line-height:1.5}
+  .t-state b{color:var(--accent)}
 /* 持仓星标 */
 .lc-star,.stock-star{cursor:pointer;font-size:14px;color:#d9b400;margin-right:3px;transition:transform .1s}
 .lc-star:hover,.stock-star:hover{transform:scale(1.2)}
@@ -215,7 +228,7 @@
   <span class="posture" id="postureTag">--</span>
   <div class="ctrl">
     <span style="position:relative;display:inline-block">
-      <input placeholder="代码查买点 600519" id="stockSearchInput" style="width:140px" onfocus="showStockHist()" onblur="hideStockHist()">
+      <input placeholder="代码/名称查买点 如 600519、贵州茅台" id="stockSearchInput" style="width:190px" onfocus="showStockHist()" onblur="hideStockHist()">
       <div id="stockHist" class="search-suggest" style="display:none;left:0;top:34px;width:240px"></div>
     </span>
     <button id="btnSearchStock">查买点</button>
@@ -248,7 +261,7 @@
 
   <!-- 区2 机会板块矩阵 -->
   <section id="sectors">
-    <h2>机会板块矩阵 <small>首屏展示 24 个，其余折叠；点击卡片加载该板块个股买点；卡片左侧色带=资金流向（红=净流入/绿=净流出，越深占比越高）</small></h2>
+    <h2>机会板块矩阵 <small>已关注板块显示在主网格，未关注折叠在更多板块；点击卡片加载该板块个股买点</small></h2>
     <div class="regime-banner" id="regimeBanner" style="display:none">
       <span class="regime-label">战略叠加层 · 当前 Regime：<b id="regimeText"></b></span>
       <span class="regime-note" id="regimeNote">当前时段暂无评述</span>
@@ -265,7 +278,7 @@
       <div class="loading">正在加载板块数据...</div>
     </div>
     <div id="loadMoreWrap" class="load-more-wrap" style="display:none">
-      <button class="load-more" id="loadMoreBtn" onclick="toggleMore()">加载更多板块 ▼</button>
+      <button class="load-more" id="loadMoreBtn" onclick="toggleMore()">更多板块 ▼</button>
     </div>
     <div class="sec-grid" id="secGridMore" style="display:none"></div>
   </section>
@@ -299,6 +312,21 @@
     <div class="lc-stage" id="lcWatchStage" style="display:none">
       <h3>① 观察池 <span class="lc-cnt" id="watchCnt">0</span> <small style="color:var(--sub);font-weight:400">通道A自动灌入 · 按 tier 排序</small></h3>
       <div id="lcWatchContent"></div>
+    </div>
+  </section>
+
+  <!-- 区5 做T信号（移植 a-trade，数据源沿用 HKS 统一 K 线入口） -->
+  <section id="ttrade">
+    <h2>做T信号 <small>低吸 / 高抛 / 止损参考；T仓状态按日记录，不自动下单</small></h2>
+    <div class="card">
+      <div class="t-toolbar">
+        <input id="tScanCode" class="sec-search" placeholder="输入代码或名称，留空扫描全部持仓" onkeydown="if(event.key==='Enter')scanTTrade()" />
+        <button class="load-more" onclick="scanTTrade()">扫描做T</button>
+        <span id="tScanMsg" style="font-size:12px;color:var(--sub)"></span>
+      </div>
+      <div id="tContent">
+        <div class="empty-hint">点击“扫描做T”查看当前持仓或指定股票的做T信号</div>
+      </div>
     </div>
   </section>
 

@@ -27,6 +27,14 @@ LLM_DEAD_WINDOW = 60      # 熔断窗口（秒）：失败后多少秒内不再�
 _LLM_DEAD_UNTIL = 0.0
 
 
+def _request_proxies() -> dict:
+    """有环境代理时显式走代理；没有则直连，避免默认 7890 造成连接失败。"""
+    px = os.environ.get("HTTPS_PROXY") or os.environ.get("HTTP_PROXY")
+    if px:
+        return {"http": px, "https": px}
+    return {}
+
+
 def load_config() -> dict:
     with _lock:
         try:
@@ -82,10 +90,7 @@ def call_llm(system: str, user: str, max_tokens: int = 400, timeout: int = None)
         "temperature": 0.3,
         "max_tokens": max_tokens,
     }
-    # 显式走代理（默认读 HTTPS_PROXY/HTTP_PROXY，缺失时回退 127.0.0.1:7890），
-    # 避免依赖 requests 的 trust_env 默认行为，保证 LLM 走代理出网。
-    _px = os.environ.get("HTTPS_PROXY") or os.environ.get("HTTP_PROXY") or "http://127.0.0.1:7890"
-    _proxies = {"http": _px, "https": _px}
+    _proxies = _request_proxies()
     try:
         r = requests.post(url, json=body,
                           headers={"Authorization": "Bearer " + llm["api_key"],
@@ -132,8 +137,7 @@ def llm_test_details() -> dict:
                      {"role": "user", "content": "只回复两个字：正常"}],
         "temperature": 0.3, "max_tokens": 200,
     }
-    _px = os.environ.get("HTTPS_PROXY") or os.environ.get("HTTP_PROXY") or "http://127.0.0.1:7890"
-    _proxies = {"http": _px, "https": _px}
+    _proxies = _request_proxies()
     try:
         r = requests.post(url, json=body,
                           headers={"Authorization": "Bearer " + llm["api_key"],

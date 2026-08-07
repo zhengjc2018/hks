@@ -16,10 +16,13 @@ let currentRegime = '';
 let paused = false;
 let refreshTimer = null;
 let loadingCount = 0;   // 必须在 loadAll() 调用前声明（防 TDZ 崩溃）
+let _tScanning = false; // 做T扫描防重入（一轮扫描可能持续数秒）
 // regime 蓝框内摘要（覆盖板块数 / 战略关注 / 观察池支数）
 let _sectorTotal = 0, _overlayFavor = 0, _watchTotal = 0;
 // 持仓星标缓存：key=code|market，value={code,market,name}
 let _holdings = new Map();
+// 板块关注持久化缓存（含当前行情列表暂缺的板块，避免切换时误删）
+let savedWatched = new Set();
 function updateRegimeSummary(){
   const el = $('regimeSummary');
   if(!el) return;
@@ -89,6 +92,13 @@ async function loadHoldings(){
     _holdings = new Map((d.holdings||[]).map(h => [_holdKey(h.code, h.market), {code: h.code, market: h.market, name: h.name||''}]));
   }catch(e){ console.warn('持仓标记加载失败:', e); }
 }
+async function loadWatchedBoards(){
+  try{
+    const d = await api('/api/watched_boards');
+    savedWatched = new Set([...savedWatched, ...(d.bks||[]).map(String)]);
+    updateWatchHint();
+  }catch(e){ console.warn('关注板块加载失败:', e); }
+}
 async function toggleHolding(secid, name, ev){
   if(ev) ev.stopPropagation();
   const {code, market} = _parseSecid(secid);
@@ -150,7 +160,9 @@ function _refreshHoldingUI(){
 
   // 启动数据拉取
   loadHoldings();
+  loadWatchedBoards();
   loadAll();
+  setTimeout(scanTTrade, 1200);
 
   // 自动刷新
   startAutoRefresh();
@@ -178,6 +190,7 @@ function startAutoRefresh(){
         return;   // 休市/午休不拉数据，避免无谓刷新
       }
       loadAll();
+      scanTTrade();
     }, sec*1000);
   }
 }
@@ -257,6 +270,8 @@ async function loadSectors(){
   try {
     const d = await api('/api/sectors_lite', {timeout: 90000});  // 轻量列表；冷启动 TDX 连接可能数十秒，放宽超时避免误报失败
     sectorCache = d.sectors || [];
+    const freshWatched = new Set(sectorCache.filter(s=>s.watched).map(s=>String(s.bk)));
+    savedWatched = new Set([...savedWatched, ...freshWatched]);
     currentRegime = d.regime || '';
     const slot = currentTradeSlot();
     if(!_sectorsFirstLoaded){
@@ -268,7 +283,7 @@ async function loadSectors(){
       // 档位变化（如午间→下午开盘）才补拉一次 LLM 板块结论
       if(slot && slot !== _lastCommentarySlot){
         _lastCommentarySlot = slot;
-        fetchSecCommentary(sectorCache.slice(0, 24));
+        fetchSecCommentary(sectorCache.filter(s=>s.watched));
       }
     }
   } catch(e) {
@@ -305,23 +320,36 @@ function renderSectors(){
     return;
   }
 
-  // 首屏仅渲染前 24，其余折叠（不点不加载精算）
-  const first = secs.slice(0, 24);
-  $('secGrid').innerHTML = first.map(s => renderSecCard(s, true)).join('');
-  if(secs.length > 24){
+  // 已关注板块固定显示在主网格，未关注折叠进“更多板块”
+  const watched = secs.filter(s => s.watched);
+  const unwatched = secs.filter(s => !s.watched);
+  $('secGrid').innerHTML = watched.length
+    ? watched.map(s => renderSecCard(s, true)).join('')
+    : '<div class="empty-hint">暂无关注板块，搜索板块后点击结果即可添加关注</div>';
+
+  $('loadMoreBtn').textContent = '更多板块 (' + unwatched.length + ') ▼';
+  if(unwatched.length){
     $('loadMoreWrap').style.display='flex';
   } else {
     $('loadMoreWrap').style.display='none';
     $('secGridMore').style.display='none';
+    moreShown = false;
   }
   updateWatchHint();
 
-  // 首屏 24 异步精算回填（不阻塞首屏渲染）
-  const need = first.filter(s => !s.summary && !s.enriched).map(s => s.bk);
+  // 主网格已关注板块异步精算回填（不阻塞首屏渲染）
+  const need = watched.filter(s => !s.summary && !s.enriched).map(s => s.bk);
   if(need.length) enrichBoards(need);
 
+  if(moreShown && unwatched.length){
+    const more = $('secGridMore');
+    more.innerHTML = unwatched.map(s=>renderSecCard(s, false)).join('');
+    more.style.display='grid';
+    $('loadMoreBtn').textContent='收起板块 ▲';
+  }
+
   // 异步拉取系统评述（只传当前显示的板块）
-  fetchSecCommentary(first);
+  fetchSecCommentary(moreShown ? secs : watched);
 }
 // 主力净流入文案：netLineText（周期刷新就地更新复用）
 function netLineText(s){
@@ -359,7 +387,7 @@ function renderSecCard(s, isFirstBatch){
   const state = s.state || s.label || '';
   const fb = flowBand(net, amount);
   const mainCls = state === '主推' ? ' main' : '';
-  const star = s.watched ? '<span class="star" title="已关注">★</span>' : '';
+  const star = `<span class="star ${s.watched ? '' : 'off'}" title="${s.watched ? '取消关注' : '点击关注'}" onclick="toggleWatchFromCard(event,'${esc(s.bk)}')">${s.watched ? '★' : '☆'}</span>`;
 
   // 角标：战略关注/回避
   let flagHtml = '';
@@ -441,7 +469,12 @@ const SEC_COMMENTARY_MAX_RETRIES = 6;
 async function fetchSecCommentary(displayedSecs){
   const noteEl = $('regimeNote');
   const comEl = $('regimeCommentary');
-  if(!displayedSecs || !displayedSecs.length) return;
+  if(!displayedSecs || !displayedSecs.length){
+    if(noteEl){ noteEl.textContent='当前时段暂无评述'; noteEl.classList.add('empty'); }
+    if(comEl){ comEl.style.display='none'; comEl.textContent=''; }
+    _secCommentaryRetries = 0;
+    return;
+  }
   if(_secCommentaryPollTimer){ clearTimeout(_secCommentaryPollTimer); _secCommentaryPollTimer = null; }
   try {
     // 首次显示加载态；后台生成中保留加载提示
@@ -532,12 +565,13 @@ function sortSectors(){
   sectorCache = arr;
 }
 function updateWatchHint(){
-  const n = sectorCache.filter(s=>s.watched).length;
+  const n = savedWatched.size;
+  const shown = sectorCache.filter(s=>s.watched).length;
   const el = $('watchHint');
   if(n===0){ el.style.display='none'; return; }
   el.style.display='inline';
-  el.className = 'watch-hint' + (n>5?' warn':'');
-  el.textContent = '已关注 '+n+' 个' + (n>5?'（建议少于5个，避免挤占前24展示）':'');
+  el.className = 'watch-hint';
+  el.textContent = n === shown ? '已关注 '+n+' 个' : '已关注 '+n+' 个（主矩阵显示 '+shown+' 个）';
 }
 function onBoardSearch(){
   const q = $('boardSearch').value.trim();
@@ -554,28 +588,36 @@ function toggleWatch(bk){
   const entry = sectorCache.find(s=>s.bk===bk);
   if(!entry) return;
   entry.watched = !entry.watched;
-  const bks = sectorCache.filter(s=>s.watched).map(s=>s.bk);
+  toast(entry.watched ? '已关注：' + entry.name : '已取消关注：' + entry.name);
+  const bkStr = String(bk);
+  if(entry.watched) savedWatched.add(bkStr); else savedWatched.delete(bkStr);
+  const bks = [...savedWatched];
   api('/api/watched_boards', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({bks})}).catch(e=>console.warn('watch save fail',e));
   sortSectors();
   renderSectors();
   $('boardSearch').value='';
   $('searchSuggest').style.display='none';
 }
+function toggleWatchFromCard(ev, bk){
+  ev.stopPropagation();
+  toggleWatch(bk);
+}
 let moreShown = false;
 function toggleMore(){
   const more = $('secGridMore');
+  const unwatched = sectorCache.filter(s=>!s.watched);
   if(moreShown){
     more.style.display='none';
-    $('loadMoreBtn').textContent='加载更多板块 ▼';
+    $('loadMoreBtn').textContent = '更多板块 (' + unwatched.length + ') ▼';
     moreShown=false;
-    // 收起后评述恢复按前24个
-    fetchSecCommentary(sectorCache.slice(0, 24));
+    // 收起后评述只覆盖主网格
+    fetchSecCommentary(sectorCache.filter(s=>s.watched));
     return;
   }
-  const rest = sectorCache.slice(24);
-  more.innerHTML = rest.map(s=>renderSecCard(s, false)).join('');
+  if(!unwatched.length) return;
+  more.innerHTML = unwatched.map(s=>renderSecCard(s, false)).join('');
   more.style.display='grid';
-  $('loadMoreBtn').textContent='收起 ▲';
+  $('loadMoreBtn').textContent='收起板块 ▲';
   moreShown=true;
   // 展开后评述覆盖全量
   fetchSecCommentary(sectorCache);
@@ -827,6 +869,13 @@ function renderLcCard(item, isReady){
   const trend = item.trend_type || '';
   const trendCls = trend === 'main' ? 'main' : (trend === 'early' ? 'early' : '');
   const trendTxt = trend === 'main' ? '主升' : (trend === 'early' ? '初期' : '');
+  const sector = item.sector || '';
+  const sectorHtml = (!isReady && sector) ? `<span class="lc-sector">${esc(sector)}</span>` : '';
+  let priceHtml = '';
+  if(!isReady && item.close != null){
+    const pctTxt = (item.pct != null) ? ' ' + fmtPct(item.pct) + '%' : '';
+    priceHtml = `<span class="lc-price">现价 ${Number(item.close).toFixed(2)}${pctTxt}</span>`;
+  }
 
   // 五条件命中条数（V5 样式）
   const bits = item.hit_bits || '';
@@ -885,9 +934,9 @@ function renderLcCard(item, isReady){
   const cardAttr = clickable ? ` onclick="focusStock('${esc(item.secid)}','${esc(name)}')"` : '';
 
   return `<div class="${cardCls}${isHold?' holding':''}"${cardAttr}>
-    <div class="lc-name"><span class="lc-star ${isHold?'on':''}" data-holding-star data-code="${esc(cm.code)}" data-market="${cm.market}" onclick="toggleHolding('${esc(item.secid)}','${esc(name)}',event)">${isHold?'★':'☆'}</span>${esc(name)} <span class="lc-code">${esc(dispCode)}</span> ${stTag(item.secid)} <span class="lc-ch ${chCls}">${ch}</span>${trendTxt ? ` <span class="lc-trend ${trendCls}">${trendTxt}</span>` : ''}</div>
+    <div class="lc-name"><span class="lc-star ${isHold?'on':''}" data-holding-star data-code="${esc(cm.code)}" data-market="${cm.market}" onclick="toggleHolding('${esc(item.secid)}','${esc(name)}',event)">${isHold?'★':'☆'}</span>${esc(name)} <span class="lc-code">${esc(dispCode)}</span> ${stTag(item.secid)} ${sectorHtml} <span class="lc-ch ${chCls}">${ch}</span>${trendTxt ? ` <span class="lc-trend ${trendCls}">${trendTxt}</span>` : ''}</div>
     <span class="lc-tier">T${tier}</span>
-    <div class="lc-meta">${esc(meta)}</div>
+    <div class="lc-meta">${priceHtml}${esc(meta)}</div>
     ${actions}
   </div>`;
 }
@@ -1120,6 +1169,114 @@ async function confirmExit(secid, layer){
     const d = await api('/api/positions');
     renderPositions(d);
   }catch(e){ alert('操作失败：'+e.message); }
+}
+
+/* ---------- 做T信号（移植 a-trade，数据源沿用 HKS K线入口） ---------- */
+async function scanTTrade(){
+  if(_tScanning) return;
+  _tScanning = true;
+  const query = ($('tScanCode').value || '').trim();
+  const msg = $('tScanMsg');
+  if(msg) msg.textContent = '扫描中…';
+  let body = {};
+  if(query){
+    if(/^\d{6}$/.test(query)){
+      const market = /^[689]/.test(query) ? 1 : 0;
+      body = {secids: [market + '.' + query]};
+    } else {
+      body = {q: query};
+    }
+  }
+  try{
+    const d = await api('/api/t_scan', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(body), timeout: 120000
+    });
+    renderTTrade(d);
+    if(msg){
+      const n = (d.items||[]).reduce((a,it)=>a+(it.signals||[]).length,0);
+      msg.textContent = d.note || ('完成：' + (d.items||[]).length + ' 只 / ' + n + ' 个信号');
+    }
+  }catch(e){
+    if(msg) msg.textContent = '扫描失败：' + e.message;
+  } finally {
+    _tScanning = false;
+  }
+}
+function tStrengthTxt(s){
+  return {weak:'弱', medium:'中', strong:'强'}[s] || s || '-';
+}
+function tStateText(state){
+  if(!state || state.status === 'empty') return '无T仓';
+  if(state.status === 'holding'){
+    return 'T仓 <b>' + Number(state.entry_price||0).toFixed(2) + '</b><br>' +
+           esc(state.entry_signal || '低吸');
+  }
+  return 'T+1锁定';
+}
+function renderTTrade(d){
+  const el = $('tContent');
+  const items = d.items || [];
+  const rows = [];
+  items.forEach(it => (it.signals || []).forEach(s => rows.push({it, s})));
+  const states = items.filter(it => it.state && it.state.status !== 'empty');
+
+  let html = '';
+  if(states.length){
+    html += `<div class="lc-lead"><span>当日 T 仓</span><span class="bar"></span></div>
+      <div class="lc-grid">${states.map(it => `
+        <div class="lc-card holding">
+          <div class="lc-name">${esc(it.name)} <span class="lc-code">${esc(it.code)}</span></div>
+          <div class="lc-meta">${tStateText(it.state)}</div>
+          <div class="lc-actions">
+            <button class="ghost" onclick="markTState('${esc(it.code)}','exit')">平T仓</button>
+          </div>
+        </div>`).join('')}
+      </div>`;
+  }
+
+  if(rows.length){
+    html += `<div class="lc-lead"><span>做T信号</span><span class="bar"></span></div>
+      <table>
+        <thead><tr><th class="l">代码 / 名称</th><th>方向</th><th>信号</th><th>强度</th><th>触发价</th><th class="l">原因</th><th class="l">T仓状态</th><th class="l">操作</th></tr></thead>
+        <tbody>${rows.map(({it, s}) => {
+          const sigCls = s.signal_type === 'buy' ? 'buy' : (s.signal_type === 'sell' ? 'sell' : 'stop');
+          const sigTxt = s.signal_type === 'buy' ? '低吸' : (s.signal_type === 'sell' ? '高抛' : '止损');
+          const price = s.trigger_price != null ? Number(s.trigger_price).toFixed(2) : '--';
+          let actions = '';
+          if(s.signal_type === 'buy' && it.state && it.state.status !== 'holding'){
+            actions += `<button class="ghost" onclick="markTState('${esc(it.code)}','buy',${price})">记入T仓</button>`;
+          }
+          if(it.state && it.state.status === 'holding' && (s.signal_type === 'sell' || s.signal_type === 'stop_loss')){
+            actions += `<button class="ghost" onclick="markTState('${esc(it.code)}','exit')">平T仓</button>`;
+          }
+          return `<tr>
+            <td class="l"><b>${esc(it.name)}</b><br><span class="lc-code">${esc(it.code)}</span></td>
+            <td><span class="t-sig ${sigCls}">${sigTxt}</span></td>
+            <td>${esc(s.signal_name)}</td>
+            <td>${tStrengthTxt(s.strength)}</td>
+            <td>${price}</td>
+            <td class="l">${esc(s.reason || '')}</td>
+            <td class="l">${tStateText(it.state)}</td>
+            <td class="l">${actions || '-'}</td>
+          </tr>`;
+        }).join('')}</tbody>
+      </table>`;
+  } else if(!states.length){
+    html = '<div class="empty-hint">' + (d.note || '本次扫描暂无做T信号') + '</div>';
+  }
+  el.innerHTML = html;
+}
+async function markTState(code, action, price){
+  const isBuy = action === 'buy';
+  if(isBuy && !confirm('记入当日 T 仓 @ ' + price + '？\n仅记录状态，不自动下单。')) return;
+  if(!isBuy && !confirm('平掉 ' + code + ' 的当日 T 仓？')) return;
+  try{
+    await api('/api/t_state', {method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({code, action, price: isBuy ? Number(price||0) : undefined})});
+    toast(isBuy ? '已记入T仓' : '已平T仓');
+    scanTTrade();
+  }catch(e){ alert('操作失败：' + e.message); }
 }
 
 /* ---------- 弹窗控制 ---------- */

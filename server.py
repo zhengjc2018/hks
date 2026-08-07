@@ -32,6 +32,7 @@ from overlay import apply_overlay, board_ok_for_date   # ★v2.1 §6.8 战略叠
 import picks   # ★选股买卖点实时扫描（配套 选股买卖点SOP.md v1；后台预计算，/api/picks 秒回缓存）
 import sell     # ★持仓卖出信号（高位十字星/长下影→清仓、盈利≥30%→减仓；读 positions.json）
 import lifecycle # ★个股全生命周期状态机（双通道进自选→观察池→盘中即时提示/盘尾确认→上车→持仓→卖出三层；挂钩≥1天已废弃）
+import t_trade  # ★做 T 信号 / T 仓状态（移植 a-trade，数据源沿用 HKS 统一 K 线入口）
 import paths
 _TDX_LOCK = threading.Lock()   # easy_tdx 非线程安全：并发 kline/board_members 互相踩坏连接→静默返回 None。全局串行化 TDX 调用。
 
@@ -205,7 +206,8 @@ def _sina_k(sym, scale, lmt):
         return []
 
 
-_PERIOD = {101: Period.DAILY, 102: Period.WEEKLY, 60: Period.MIN_60, 15: Period.MIN_15}
+_PERIOD = {101: Period.DAILY, 102: Period.WEEKLY, 5: Period.MIN_5,
+           15: Period.MIN_15, 60: Period.MIN_60}
 
 
 def _tdx_klines(secid, klt, lmt):
@@ -244,7 +246,7 @@ def _klines(secid, klt, lmt):
     if klt == 102:  # 周K：拉日K聚合（新浪无直接周K）
         rows = _sina_k(sym, 240, max(lmt * 5, 250))
         return _agg_weekly(_sina_to_internal(rows))
-    scale = {101: 240, 60: 60, 15: 15}.get(klt, 240)
+    scale = {101: 240, 5: 5, 60: 60, 15: 15}.get(klt, 240)
     return _sina_to_internal(_sina_k(sym, scale, lmt))
 
 
@@ -1065,6 +1067,7 @@ def load_watched():
 
 def save_watched(lst):
     try:
+        paths.ensure_data_dir()
         with open(_WATCHED_FILE, "w", encoding="utf-8") as f:
             json.dump([str(x) for x in lst], f, ensure_ascii=False, indent=2)
         return True
@@ -1403,10 +1406,13 @@ def _generate_commentary_overview(sectors, cur_slot):
     ut = f"以下A股板块：{names}。用一行`总览：`开头，≤50字给出整体格局一句话。只输出总览行。"
     ov = call_llm(sys_text, ut, max_tokens=120)
     if ov:
-        for line in ov.strip().split("\n"):
-            line = line.strip()
-            if line.startswith("总览："):
-                return line[3:].strip(), True
+        line = ov.strip().split("\n")[0].strip()
+        if line.startswith("总览："):
+            line = line[3:].strip()
+        elif line.startswith("总览:"):
+            line = line.split(":", 1)[1].strip()
+        if line:
+            return line[:60], True
     return None, False
 
 
@@ -1433,7 +1439,7 @@ def _bg_generate_commentary(sectors, cur_slot):
         # 2) 总览：若缓存没有或不是 LLM 生成，尝试补一个
         text = cache.get("text")
         ov_is_llm = False
-        if not text or text.startswith("首屏"):
+        if not text or text.startswith("首屏") or text.startswith("模拟总览"):
             text, ov_is_llm = _generate_commentary_overview(sectors, cur_slot)
             if ov_is_llm:
                 cache.update({
@@ -1695,7 +1701,7 @@ def stock_detail(code: str, market: int, name: str = ""):
 
 
 def _resolve_secid(q):
-    """代码/名称 → secid(market.code)。6位代码按市场前缀推断；名称在 picks 缓存模糊匹配。"""
+    """代码/名称/拼音 → secid(market.code)。6位代码按市场前缀推断；名称先查 picks 缓存，再走东方财富联想。"""
     q = (q or "").strip()
     if re.fullmatch(r"\d{6}", q):
         m = "1" if q[0] in "689" else "0"   # 沪市 6/688/8/9；深市 0/3
@@ -1709,6 +1715,42 @@ def _resolve_secid(q):
                 for r in grp:
                     if r.get("name") and q in r.get("name"):
                         return r.get("secid")
+    hit = _search_stock(q)
+    if hit:
+        return hit[0]
+    return None
+
+
+def _search_stock(q):
+    """东方财富联想接口：名称/拼音/代码 → (secid, name)，带短缓存。"""
+    key = re.sub(r"\s+", "", str(q or "")).strip()
+    if not key:
+        return None
+    cache_key = "stock_suggest:" + key.lower()
+    cached = cache_get(cache_key, 3600)
+    if cached:
+        return tuple(cached)
+    try:
+        data = em_get("https://searchapi.eastmoney.com", "/api/suggest/get", {
+            "input": key,
+            "type": 14,
+            "token": "D43BF722C8E33BDC906FB84D85E326E8",
+            "count": 8,
+        }, timeout=5, retries=1)
+        table = (data or {}).get("QuotationCodeTable") or {}
+        for row in table.get("Data") or []:
+            if row.get("Classify") != "AStock":
+                continue
+            if str(row.get("MktNum")) not in ("0", "1"):
+                continue
+            secid = str(row.get("QuoteID") or "").strip()
+            if re.fullmatch(r"[01]\.\d{6}", secid):
+                name = str(row.get("Name") or "").strip()
+                out = (secid, name)
+                cache_set(cache_key, out)
+                return out
+    except Exception as e:
+        print("[stock_suggest] err:", e)
     return None
 
 
@@ -1763,7 +1805,7 @@ def api_stock_seq():
         return jsonify({"error": "空查询"}), 400
     secid = _resolve_secid(q)
     if not secid:
-        return jsonify({"error": "无法识别，请输入6位代码或缓存内名称"}), 404
+        return jsonify({"error": "无法识别，请输入6位代码、个股名称或拼音"}), 404
     try:
         r = picks.scan_stock(secid, _resolve_name(secid, q))
     except Exception as e:
@@ -2010,6 +2052,169 @@ def api_holdings_post():
             return jsonify({"error": "未知 action"}), 400
         save_holdings(lst)
         return jsonify({"ok": True, "holdings": lst})
+    except Exception as e:  # noqa
+        return jsonify({"error": str(e)}), 500
+
+
+# ---------------------------------------------------------------------------
+# 做 T 信号（移植 a-trade；仅研究提示，不自动下单）
+# ---------------------------------------------------------------------------
+_T_STATE_STORE = t_trade.TStateStore()
+_T_TRAILING_CFG = t_trade.TrailingConfig()
+
+
+def _t_universe():
+    """扫描对象：positions.json 明细持仓 + holdings.json 星标持仓。"""
+    items, seen = [], set()
+    for p in sell.load_positions():
+        secid = str(p.get("secid") or "")
+        if not secid:
+            code = str(p.get("code") or "")
+            market = int(p.get("market") or (1 if str(code).startswith("6") else 0))
+            secid = f"{market}.{code}"
+        if not secid or secid in seen:
+            continue
+        seen.add(secid)
+        code = secid.split(".")[-1]
+        items.append({
+            "secid": secid, "code": code, "name": p.get("name") or code,
+            "cost_price": p.get("entry_price"), "shares": p.get("shares"),
+        })
+    for h in load_holdings():
+        code = str(h.get("code", ""))
+        if not code:
+            continue
+        market = int(h.get("market", 1))
+        secid = f"{market}.{code}"
+        if secid in seen:
+            continue
+        seen.add(secid)
+        items.append({
+            "secid": secid, "code": code, "name": h.get("name") or code,
+            "cost_price": None, "shares": None,
+        })
+    return items
+
+
+def _signal_dict(item, sig, source="signal"):
+    d = {
+        "secid": item["secid"], "code": item["code"], "name": item["name"],
+        "signal_type": sig.signal_type if isinstance(sig, t_trade.TrailingAction) else sig.signal_type.value,
+        "signal_name": sig.name if hasattr(sig, "name") else "T仓追踪",
+        "strength": getattr(sig, "strength", "strong"),
+        "reason": sig.reason,
+        "trigger_price": sig.trigger_price,
+        "target_price": getattr(sig, "target_price", None),
+        "stop_loss": getattr(sig, "stop_loss", None),
+        "factor_hits": getattr(sig, "factor_hits", []) or [],
+        "source": source,
+    }
+    if isinstance(getattr(sig, "strength", None), t_trade.SignalStrength):
+        d["strength"] = sig.strength.value
+    return d
+
+
+def _t_scan(items):
+    out = []
+    for item in items:
+        try:
+            rows = _klines(item["secid"], 5, 180)
+            if not rows or len(rows) < 30:
+                continue
+            signals, df = t_trade.scan_rows(item["code"], rows)
+            current_price = float(df.iloc[-1]["close"]) if len(df) else None
+            state = _T_STATE_STORE.get(item["code"])
+            trailing = None
+            if state.status == "holding" and current_price:
+                state = _T_STATE_STORE.update_peak(item["code"], current_price)
+                trailing = t_trade.check_trailing(
+                    state, current_price, _T_TRAILING_CFG
+                )
+            item_signals = [_signal_dict(item, s) for s in signals]
+            if trailing:
+                item_signals.insert(0, _signal_dict(item, trailing, source="t_state"))
+            out.append({
+                "secid": item["secid"], "code": item["code"],
+                "name": item["name"], "close": current_price,
+                "signals": item_signals,
+                "state": {
+                    "status": state.status,
+                    "entry_price": state.entry_price,
+                    "entry_time": state.entry_time,
+                    "entry_signal": state.entry_signal,
+                    "peak_price": state.peak_price,
+                    "lots": state.lots,
+                },
+                "ts": int(time.time()),
+            })
+        except Exception as e:
+            print("[t_scan] err", item.get("secid"), e)
+    return out
+
+
+@app.route("/api/t_scan", methods=["POST"])
+def api_t_scan():
+    try:
+        body = request.get_json(force=True) or {}
+        q = str(body.get("q") or "").strip()
+        secids = [str(x).strip() for x in (body.get("secids") or []) if str(x).strip()]
+        if q and not secids:
+            secid = _resolve_secid(q)
+            if not secid:
+                return jsonify({"error": "无法识别，请输入6位代码、个股名称或拼音"}), 404
+            code = secid.split(".", 1)[1]
+            items = [{
+                "secid": secid, "code": code,
+                "name": _resolve_name(secid, q) or code,
+                "cost_price": None, "shares": None,
+            }]
+        elif secids:
+            items = []
+            for secid in secids:
+                parts = secid.split(".")
+                code = parts[-1]
+                market = int(parts[0]) if len(parts) > 1 else (
+                    1 if str(code).startswith("6") else 0
+                )
+                items.append({
+                    "secid": f"{market}.{code}", "code": code,
+                    "name": body.get("name") or code,
+                    "cost_price": None, "shares": None,
+                })
+        else:
+            items = _t_universe()
+        if not items:
+            return jsonify({
+                "ok": True, "items": [], "note": "暂无持仓，可传入 secids 指定股票扫描",
+            })
+        return jsonify({"ok": True, "items": _t_scan(items)})
+    except Exception as e:  # noqa
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/t_state", methods=["POST"])
+def api_t_state():
+    """记录/平掉当日 T 仓状态。action: buy / exit。"""
+    try:
+        body = request.get_json(force=True) or {}
+        code = str(body.get("code", "")).zfill(6)
+        action = str(body.get("action", ""))
+        if not code or not action:
+            return jsonify({"error": "缺少 code 或 action"}), 400
+        if action == "buy":
+            _T_STATE_STORE.mark_buy(
+                code,
+                float(body.get("price", 0)),
+                float(body.get("lots", 1.0)),
+                str(body.get("signal_name", "手动低吸")),
+            )
+        elif action == "exit":
+            _T_STATE_STORE.mark_exit(
+                code, status=str(body.get("status", "empty"))
+            )
+        else:
+            return jsonify({"error": "action 只支持 buy / exit"}), 400
+        return jsonify({"ok": True, "state": _T_STATE_STORE.get(code).__dict__})
     except Exception as e:  # noqa
         return jsonify({"error": str(e)}), 500
 

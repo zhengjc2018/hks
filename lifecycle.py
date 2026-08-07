@@ -120,6 +120,8 @@ def _new_entry(secid, name, channel, tier=4, sector=None, bk=None):
         "tier": tier,                # 4-Tier 注意力分级（仅展示，不参与上车判定）
         "sector": sector,
         "bk": bk,
+        "close": None,               # 最新收盘/现价（展示用）
+        "pct": None,                 # 最新涨跌幅（展示用）
         "stage": STAGE_WATCH,
         "hooked_date": today,        # 进观察池日
         "seq8_state": "idle",        # idle / waiting / triggered / expired
@@ -190,6 +192,12 @@ def ingest():
             e["entry_ok"] = r.get("entry_ok")
             e["entry_ma5_ratio"] = r.get("entry_ma5_ratio")
             e["entry_filtered"] = bool(e["c5"] and r.get("entry_ok") is False)
+            e["sector"] = r.get("sector") or e.get("sector")
+            e["bk"] = r.get("bk") or e.get("bk")
+            if r.get("close") is not None:
+                e["close"] = r.get("close")
+            if r.get("pct") is not None:
+                e["pct"] = r.get("pct")
             bits = []
             if e["c1"]: bits.append("①")
             if e["c2"]: bits.append("②")
@@ -270,6 +278,12 @@ def evaluate():
             e["entry_ok"] = r.get("entry_ok")
             e["entry_ma5_ratio"] = r.get("entry_ma5_ratio")
             e["entry_filtered"] = bool(e["c5"] and r.get("entry_ok") is False)
+            e["sector"] = r.get("sector") or e.get("sector")
+            e["bk"] = r.get("bk") or e.get("bk")
+            if r.get("close") is not None:
+                e["close"] = r.get("close")
+            if r.get("pct") is not None:
+                e["pct"] = r.get("pct")
             stage = r.get("stage") or e.get("seq8_state") or "idle"
             bits = []
             if e["c1"]: bits.append("①")
@@ -444,6 +458,10 @@ def add_manual(secid, name=None):
             entry["c4"] = bool(r.get("c4"))
             entry["c5"] = bool(r.get("c5"))
             entry["trend_type"] = r.get("trend_type")   # ★2026-08-05 双路径标签
+            if r.get("close") is not None:
+                entry["close"] = r.get("close")
+            if r.get("pct") is not None:
+                entry["pct"] = r.get("pct")
             bits = []
             if entry["c1"]: bits.append("①")
             if entry["c2"]: bits.append("②")
@@ -562,6 +580,8 @@ def _pool_watch_entry(r):
         "secid": secid, "name": r.get("name"),
         "tier": r.get("tier", 2), "stage": r.get("stage") or "watch",
         "channel": "A", "merged_pool": True,
+        "sector": r.get("sector"), "bk": r.get("bk"),
+        "close": r.get("close"), "pct": r.get("pct"),
         "c1": c1, "c2": c2, "c3a": c3a, "c3b": c3b, "c4": c4, "c5": c5,
         "trend_type": r.get("trend_type"),   # ★2026-08-05 双路径标签
         "hit_bits": bits,
@@ -596,6 +616,23 @@ def get_snapshot():
         if merged:
             groups["watch"] = groups["watch"] + merged
             groups["watch"].sort(key=lambda x: (x.get("tier") or 9, x.get("secid") or ""))
+        # 观察池展示字段补齐：板块 / 现价 / 涨跌幅（picks 缓存有值时优先）
+        all_picks = {}
+        for grp in (pc or {}).values():
+            if isinstance(grp, list):
+                for r in grp:
+                    if r.get("secid"):
+                        all_picks[r["secid"]] = r
+        for e in groups["watch"]:
+            r = all_picks.get(e.get("secid"))
+            if not r:
+                continue
+            e["sector"] = r.get("sector") or e.get("sector")
+            e["bk"] = r.get("bk") or e.get("bk")
+            if r.get("close") is not None:
+                e["close"] = r.get("close")
+            if r.get("pct") is not None:
+                e["pct"] = r.get("pct")
     except Exception as e:
         print("[lifecycle] merge pool err:", e)
     return {"ts": int(time.time()), "groups": groups,
