@@ -11,7 +11,7 @@ import threading
 def _seed_defaults() -> None:
     import paths
 
-    data = os.environ.get("APANEL_DATA_DIR") or os.environ.get("HOME") or paths.APP_DIR
+    data = os.environ.get("APANEL_DATA_DIR") or paths.data_dir()
     os.environ["APANEL_DATA_DIR"] = data
     paths.ensure_data_dir()
 
