@@ -10,10 +10,12 @@ import threading
 import time
 from functools import lru_cache
 
+import numpy as np
 import pandas as pd
 import requests
 
 import paths
+import gap_model
 
 # 延迟导入 server：与 picks 相同，运行时 server 已完全加载。
 import server
@@ -256,6 +258,8 @@ def _add_limit_labels(df: pd.DataFrame) -> pd.DataFrame:
         current = current + 1 if flag else 0
         streak.append(current)
     out["limit_streak"] = streak
+    out["prev_limit_up"] = out["is_limit_up"].shift(1, fill_value=False).astype(int)
+    out["limit_streak_prev"] = out["limit_streak"].shift(1, fill_value=0).astype(int)
     return out
 
 
@@ -263,6 +267,7 @@ def _add_features(df: pd.DataFrame) -> pd.DataFrame:
     out = df.copy()
     out["vol_ratio_5"] = out["volume"] / out["volume"].rolling(5).mean().shift(1)
     prev_close = out["pre_close"] if "pre_close" in out.columns else out["close"].shift(1)
+    out["pct_chg"] = (out["close"] / prev_close - 1) * 100
     out["amplitude_pct"] = (out["high"] - out["low"]) / prev_close * 100
     span = out["high"] - out["low"]
     out["body_ratio"] = ((out["close"] - out["open"]) / span).where(span > 0, 1.0)
@@ -387,6 +392,10 @@ def build_candidates(
                 "pos_ma20": _to_float(last.get("pos_ma20"), None),
                 "pos_ma60": _to_float(last.get("pos_ma60"), None),
                 "amount_yi": _to_float(last.get("amount_yi"), None),
+                "pct_chg": _to_float(last.get("pct_chg"), None),
+                "body_ratio": _to_float(last.get("body_ratio"), None),
+                "prev_limit_up": int(_to_float(last.get("prev_limit_up"), 0)),
+                "limit_streak_prev": int(_to_float(last.get("limit_streak_prev"), 0)),
             }
             if any(v is None or pd.isna(v) for v in features.values()):
                 continue
@@ -431,8 +440,25 @@ def score_candidates(candidates: list[dict]) -> list[dict]:
     ]
     df["score"] = df[hit_columns].sum(axis=1).astype(int)
     df["reason"] = df.apply(_recommend_reason, axis=1)
-    df = df.sort_values(["score", "industry_limit_count"], ascending=[False, False])
-    return df.to_dict("records")
+    model_feats = gap_model.model_features()
+    df["prob"] = np.nan
+    if model_feats:
+        def _prob(row):
+            return gap_model.score({k: row.get(k) for k in model_feats})
+        df["prob"] = df.apply(_prob, axis=1)
+    if df["prob"].notna().any():
+        df = df.sort_values(
+            ["prob", "score", "industry_limit_count"],
+            ascending=[False, False, False],
+            na_position="last",
+        )
+    else:
+        df = df.sort_values(["score", "industry_limit_count"], ascending=[False, False])
+    records = df.to_dict("records")
+    for rec in records:
+        if rec.get("prob") is not None and pd.isna(rec["prob"]):
+            rec["prob"] = None
+    return records
 
 
 def _recommend_reason(row) -> str:
@@ -497,12 +523,14 @@ def _compute(scope=None):
     candidates = build_candidates(scoped_df, zt_df, trade_date, scope)
     print(f"[gap_pick] 硬过滤后候选 {len(candidates)} 只，开始评分", flush=True)
     scored = score_candidates(candidates)
+    ranking = "model" if any(pd.notna(c.get("prob")) for c in scored) else "rule"
     return {
         "date": trade_date,
         "ts": int(time.time()),
         "elapsed_sec": round(time.time() - t0, 1),
         "total": len(scored),
         "candidates": scored[:TOP_N],
+        "ranking": ranking,
         "scope_key": _scope_key(scope),
     }
 

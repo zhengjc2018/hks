@@ -22,6 +22,9 @@ _sec_commentary_cache.json
 .news_cache/
 logs/
 
+# 生成的训练/回测输出（本地留档，不提交）
+backtest_report/
+
 # 内置初始数据快照（随 APK/EXE 打包）
 seed/*
 !seed/lifecycle.json

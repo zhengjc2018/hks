@@ -52,6 +52,7 @@ val copyPythonSources = tasks.register<Copy>("copyPythonSources") {
         include("*.py")
         include("frontend/**")
         include("config.example.json")
+        include("gap_model.json")
         exclude("wsgi.py")
     }
     from(rootProject.file("seed")) {

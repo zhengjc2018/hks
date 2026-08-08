@@ -34,6 +34,8 @@ import sell     # ★持仓卖出信号（高位十字星/长下影→清仓、�
 import lifecycle # ★个股全生命周期状态机（双通道进自选→观察池→盘中即时提示/盘尾确认→上车→持仓→卖出三层；挂钩≥1天已废弃）
 import t_trade  # ★做 T 信号 / T 仓状态（移植 a-trade，数据源沿用 HKS 统一 K 线入口）
 import gap_pick  # ★次日高开候选（移植 a-trade，数据源沿用 HKS 统一 K 线 / 东方财富入口）
+import gap_model  # ★次日高开排序模型推理（纯 numpy，无模型时回退规则评分）
+import app_update  # ★Windows EXE 自动更新（检查/下载/退出后替换重启）
 import paths
 _TDX_LOCK = threading.Lock()   # easy_tdx 非线程安全：并发 kline/board_members 互相踩坏连接→静默返回 None。全局串行化 TDX 调用。
 
@@ -1942,9 +1944,35 @@ def api_next_day_gap():
         "computing": gap_pick.is_computing(),
         "ts": gap_pick.cache_ts(),
         "last_err": gap_pick.last_err(),
+        "model": gap_model.meta(),
         "scope": scope,
         "data": data,
     })
+
+
+@app.route("/api/update/check")
+def api_update_check():
+    """检查 GitHub release 是否有更新。"""
+    return jsonify(app_update.check_update())
+
+
+@app.route("/api/update/download", methods=["POST"])
+def api_update_download():
+    """下载对应平台安装包到本地数据目录（后台下载，轮询 status）。"""
+    force = request.args.get("force") == "1"
+    ok, msg = app_update.download_update(force=force)
+    return jsonify({"ok": ok, "message": msg})
+
+
+@app.route("/api/update/status")
+def api_update_status():
+    return jsonify(app_update.update_status())
+
+
+@app.route("/api/update/apply", methods=["POST"])
+def api_update_apply():
+    """Windows 打包版：启动更新器，退出后替换 exe 并重启。"""
+    return jsonify(app_update.apply_update())
 
 
 @app.route("/api/sells")

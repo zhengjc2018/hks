@@ -248,6 +248,7 @@
     <button id="btnSearchStock">查买点</button>
     <button onclick="openModal('positionsModal')">我的持仓</button>
     <button onclick="openSettings()">⚙ 设置</button>
+    <button onclick="openUpdate()">⬇ 检查更新</button>
     <button onclick="location.href='/game'">🎮 训练游戏</button>
     <button onclick="reportIssue()">📝 上报问题</button>
     <button id="themeBtn">🌙 夜间</button>
@@ -434,6 +435,17 @@
   </div>
 </div>
 
+<!-- 检查更新 弹窗 -->
+<div class="modal-mask" id="updateModal">
+  <div class="modal">
+    <button class="close" onclick="closeModal('updateModal')">×</button>
+    <h3>检查更新</h3>
+    <div id="updateBody">
+      <div class="empty-hint">正在检查更新…</div>
+    </div>
+  </div>
+</div>
+
 <!-- 个股详情 页内弹窗（iframe 复用 /preview，自动按 URL 参数加载对应股票） -->
 <div class="modal-mask" id="previewModal">
   <div class="modal preview-modal">
@@ -442,6 +454,6 @@
   </div>
 </div>
 
-<script src="/assets/app.js?v=20260806k"></script>
+<script src="/assets/app.js?v=20260808u"></script>
 </body>
 </html>

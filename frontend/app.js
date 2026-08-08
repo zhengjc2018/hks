@@ -1306,7 +1306,12 @@ async function loadNextDay(force){
       }
     } else if(msg){
       if(d.last_err) msg.textContent = '上次计算失败：' + d.last_err;
-      else if(d.data) msg.textContent = '候选 ' + d.data.total + ' 只 · ' + d.data.date;
+      else if(d.data){
+        const mode = (d.data.ranking === 'model' && d.model)
+          ? ' · 模型 v' + (d.model.version || 1)
+          : ' · 规则排序';
+        msg.textContent = '候选 ' + d.data.total + ' 只 · ' + d.data.date + mode;
+      }
       else msg.textContent = '暂无候选数据';
     }
   }catch(e){
@@ -1325,9 +1330,10 @@ function renderNextDay(d){
     el.innerHTML = '<div class="empty-hint">今日暂无符合条件的次日高开候选</div>';
     return;
   }
+  const useModel = rows[0] && rows[0].prob != null;
   el.innerHTML = `<div class="lc-lead"><span>次日高开 Top ${rows.length}</span><span class="bar"></span></div>
     <table>
-      <thead><tr><th>排名</th><th class="l">代码 / 名称</th><th class="l">行业</th><th>现价</th><th>涨跌</th><th>量比</th><th>振幅%</th><th>板块涨停</th><th class="l">推荐原因</th><th>得分</th></tr></thead>
+      <thead><tr><th>排名</th><th class="l">代码 / 名称</th><th class="l">行业</th><th>现价</th><th>涨跌</th><th>量比</th><th>振幅%</th><th>板块涨停</th><th class="l">推荐原因</th><th>${useModel ? '概率' : '得分'}</th></tr></thead>
       <tbody>${rows.map((r, i) => {
         const code = String(r.code||'').padStart(6,'0');
         const market = /^[689]/.test(code) ? 1 : 0;
@@ -1341,7 +1347,7 @@ function renderNextDay(d){
           <td>${Number(r.amplitude_pct||0).toFixed(2)}</td>
           <td>${Number(r.industry_limit_count||0)}</td>
           <td class="l" style="color:var(--sub);font-size:11px;line-height:1.5">${esc(r.reason||'')}</td>
-          <td><b>${Number(r.score||0)}</b></td>
+          <td><b>${r.prob != null ? (Number(r.prob)*100).toFixed(1)+'%' : Number(r.score||0)}</b></td>
         </tr>`;
       }).join('')}</tbody>
     </table>`;
@@ -1425,6 +1431,94 @@ async function markTState(code, action, price){
 /* ---------- 弹窗控制 ---------- */
 function openModal(id){ $(id).classList.add('show'); }
 function closeModal(id){ $(id).classList.remove('show'); }
+
+/* ---------- Windows 自动更新 ---------- */
+let _updatePoll = null;
+async function openUpdate(){
+  openModal('updateModal');
+  const body = $('updateBody');
+  body.innerHTML = '<div class="empty-hint">正在检查更新…</div>';
+  try{
+    const r = await api('/api/update/check', {timeout: 30000});
+    renderUpdateResult(r);
+  }catch(e){
+    body.innerHTML = '<div class="empty-hint">检查失败：' + esc(e.message) + '</div>';
+  }
+}
+function renderUpdateResult(r){
+  const body = $('updateBody');
+  if(!r || !r.ok){
+    body.innerHTML = '<div class="empty-hint">' + esc((r && r.error) || '检查失败') + '</div>';
+    return;
+  }
+  const cur = esc(r.current_version || '?');
+  const latest = esc(r.latest_version || '?');
+  if(!r.has_update){
+    body.innerHTML = '<div class="empty-hint">当前已是最新版本 v' + cur + '</div>' +
+      '<div class="row" style="margin-top:14px;text-align:center"><button class="primary" onclick="closeModal(\'updateModal\')">好的</button></div>';
+    return;
+  }
+  const notes = (r.notes || '').trim();
+  body.innerHTML = '<div style="margin-bottom:8px"><b>发现新版本 v' + latest + '</b>（当前 v' + cur + '）</div>' +
+    (notes ? '<div style="font-size:12px;color:var(--sub);white-space:pre-wrap;max-height:140px;overflow:auto;margin-bottom:12px">' + esc(notes) + '</div>' : '') +
+    '<div class="row" style="margin:14px 0 0;text-align:center">' +
+      '<button class="primary" onclick="startUpdateDownload()">下载并更新</button>' +
+      '<button style="margin-left:8px" onclick="closeModal(\'updateModal\')">稍后</button>' +
+    '</div>';
+}
+async function startUpdateDownload(){
+  const body = $('updateBody');
+  body.innerHTML = '<div class="empty-hint">准备下载…</div>';
+  try{
+    const r = await api('/api/update/download', {method:'POST', headers:{'Content-Type':'application/json'}, body:'{}', timeout:30000});
+    if(!r.ok){ body.innerHTML = '<div class="empty-hint">' + esc(r.message || '启动下载失败') + '</div>'; return; }
+    pollUpdateStatus();
+  }catch(e){
+    body.innerHTML = '<div class="empty-hint">启动下载失败：' + esc(e.message) + '</div>';
+  }
+}
+async function pollUpdateStatus(){
+  if(_updatePoll){ clearTimeout(_updatePoll); _updatePoll = null; }
+  const body = $('updateBody');
+  try{
+    const s = await api('/api/update/status', {timeout:15000});
+    if(s.status === 'downloading'){
+      const pct = s.progress != null ? Number(s.progress).toFixed(1) : '?';
+      const mb = s.bytes ? (s.bytes/1048576).toFixed(1) : '0.0';
+      const total = s.total ? (s.total/1048576).toFixed(1) : '?';
+      body.innerHTML = '<div class="empty-hint">正在下载 ' + pct + '%（' + mb + ' / ' + total + ' MB）</div>';
+      _updatePoll = setTimeout(pollUpdateStatus, 1000);
+      return;
+    }
+    if(s.status === 'done'){
+      body.innerHTML = '<div class="empty-hint">下载完成：' + esc(s.asset_name || '安装包') + '</div>' +
+        '<div class="row" style="margin-top:14px;text-align:center">' +
+          '<button class="primary" onclick="applyUpdateNow()">退出并安装</button>' +
+          '<button style="margin-left:8px" onclick="closeModal(\'updateModal\')">稍后</button>' +
+        '</div>';
+      return;
+    }
+    body.innerHTML = '<div class="empty-hint">' + esc(s.message || s.error || '未知状态') + '</div>';
+  }catch(e){
+    body.innerHTML = '<div class="empty-hint">查询更新状态失败：' + esc(e.message) + '</div>';
+  }
+}
+async function applyUpdateNow(){
+  if(!confirm('确定退出当前程序并自动安装更新？')) return;
+  const body = $('updateBody');
+  body.innerHTML = '<div class="empty-hint">正在启动更新…</div>';
+  try{
+    const r = await api('/api/update/apply', {method:'POST', headers:{'Content-Type':'application/json'}, body:'{}', timeout:15000});
+    if(r.ok){
+      body.innerHTML = '<div class="empty-hint">' + esc(r.message || '更新已启动') + '<br><br>程序即将退出，请稍候重新打开。</div>';
+    } else {
+      body.innerHTML = '<div class="empty-hint">' + esc(r.error || '安装失败') + '</div>';
+    }
+  }catch(e){
+    body.innerHTML = '<div class="empty-hint">启动更新失败：' + esc(e.message) + '</div>';
+  }
+}
+
 async function openSettings(){
   try{
     const cfg = await api('/api/config');

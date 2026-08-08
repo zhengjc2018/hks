@@ -29,6 +29,7 @@ jobs:
           pyinstaller --noconfirm --clean --onefile --name "hks" `
             --add-data "frontend;frontend" `
             --add-data "config.example.json;." `
+            --add-data "gap_model.json;." `
             --add-data "seed;seed" `
             --collect-all easy_tdx `
             exe_launcher.py

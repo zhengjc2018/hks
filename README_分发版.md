@@ -93,7 +93,37 @@ hks/
   requirements.lock.txt  # 依赖精确版本
 ```
 
-## 九、已知限制
+## 九、次日高开排序模型（可选）
+
+`gap_model.json` 会随 APK / EXE 一起打包，次日高开候选保留全部规则硬过滤，
+只由模型调整 TopN 排序。模型在桌面端离线训练，手机 / 电脑打包版不会自动训练：
+
+```bash
+# 冒烟：几只票验证管线
+.venv/bin/python train_gap_model.py --codes 600519,000001 --epochs 30
+
+# 全主板块训练（不依赖 sklearn，产物 gap_model.json 会随包分发）
+.venv/bin/python train_gap_model.py --industry-filter --epochs 100
+
+# 只训练热点板块成分股：把代码列表写入文件后
+.venv/bin/python train_gap_model.py --symbols-file universe.txt --epochs 100
+```
+
+训练脚本会输出测试集上模型 Top1/3/10 与规则基线的对比，并把逐日候选写入
+`backtest_report/gap_model_train_report.csv`。训练完成后重启服务即自动加载
+`gap_model.json`，前端候选表会从“得分”切换成模型概率；删掉模型文件即回到
+规则排序。重新训练后记得把新的 `gap_model.json` 一起提交，下一次 APK / EXE
+构建会自动带上。
+
+## 十、Windows 自动更新（仅打包版）
+
+顶部「检查更新」按钮会读取 GitHub release（默认 `zhengjc2018/hks` 的
+`v1.0.0-windows` tag），发现新版本后下载对应 exe 到本地数据目录，用户确认后
+启动更新器：程序退出 → 替换 `hks.exe` → 自动重新打开。源码运行或非 Windows
+环境只提示不支持，不会误装。发布新版本时记得同时更新 `app_update.py` 里的
+`APP_VERSION`（或 `config.json` 的 `app_version`）。
+
+## 十一、已知限制
 
 - 当前 LLM 网关失效期间，真实大模型分析需群友自备 endpoint+key；否则看到的是离线模拟简评。
 - 网络质量差时，板块矩阵冷加载可能偏慢（启动已预热，正常使用不卡）。
