@@ -1824,6 +1824,12 @@ def index():
     return send_from_directory(app.static_folder, "index.html")
 
 
+@app.route("/game")
+@app.route("/game/")
+def game_index():
+    return send_from_directory(app.static_folder, "game/index.html")
+
+
 @app.route("/preview")
 def preview():
     resp = send_from_directory(app.static_folder, "preview.html")
