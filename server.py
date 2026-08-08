@@ -1824,24 +1824,6 @@ def index():
     return send_from_directory(app.static_folder, "index.html")
 
 
-@app.route("/manifest.webmanifest")
-def webmanifest():
-    return send_from_directory(
-        app.static_folder,
-        "manifest.webmanifest",
-        mimetype="application/manifest+json",
-    )
-
-
-@app.route("/sw.js")
-def service_worker():
-    return send_from_directory(
-        app.static_folder,
-        "sw.js",
-        mimetype="application/javascript",
-    )
-
-
 @app.route("/preview")
 def preview():
     resp = send_from_directory(app.static_folder, "preview.html")

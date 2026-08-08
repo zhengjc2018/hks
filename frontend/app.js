@@ -1578,9 +1578,3 @@ async function reportIssue() {
   window.open(url, '_blank');
   toast(ok ? '已复制诊断信息，请在打开的表单里粘贴并提交，谢谢～' : '已打开反馈表单，请手动复制诊断信息后粘贴提交', 4200);
 }
-
-if('serviceWorker' in navigator){
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').catch(e => console.warn('SW 注册失败:', e));
-  });
-}
