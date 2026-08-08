@@ -2569,10 +2569,17 @@ def _scheduler_loop():
         nxt = (min(cands) if cands
                else (now.replace(hour=10, minute=0, second=0, microsecond=0)
                      + datetime.timedelta(days=1)))
+        slot = (nxt.hour, nxt.minute) if cands else None
         time.sleep(max(1.0, (nxt - now).total_seconds()))
         # 再次检查：sleep 醒来后若已是周末则不执行
         if datetime.datetime.now().weekday() < 5:
             _round_refresh()
+            if slot == (14, 30):
+                try:
+                    gap_pick.trigger_refresh()
+                    print("[scheduler] 14:30 次日高开候选已触发", flush=True)
+                except Exception as e:
+                    print("[scheduler] gap_pick trigger err", e)
 
 
 def start_board_scheduler():
@@ -2582,7 +2589,7 @@ def start_board_scheduler():
     _SCHED_STARTED = True
     t = threading.Thread(target=_scheduler_loop, daemon=True)
     t.start()
-    print("[scheduler] 板块3轮调度已启动(10:00/13:30/14:30)")
+    print("[scheduler] 板块3轮调度已启动(10:00/13:30/14:30)，14:30 触发高开候选")
 
 
 if __name__ == "__main__":
