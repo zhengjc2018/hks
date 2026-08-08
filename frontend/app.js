@@ -212,7 +212,8 @@ function loadAll(){
   Promise.allSettled([
     loadMarket(),
     loadSectors(),
-    loadLifecycle()
+    loadLifecycle(),
+    loadNextDay()
   ]).finally(()=>{
     loadingCount--;
     $('updated').textContent = new Date().toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'})+' 更新';
@@ -795,11 +796,12 @@ async function loadLifecycle(){
 }
 function renderPipeline(d){
   const groups = (d && d.groups) || {};
-  const ready = groups.ready || [];   // 待上车列表
+  const filter = _getFilter();
+  const ready = (groups.ready || []).filter(r => _passFilter(r, filter));   // 待上车列表
   const watchRaw = groups.watch || [];   // 观察池原始列表
   // ★展示门槛（2026-08-05）：最笨逻辑——观察池至少得有 ① ② 和 ③a 命中才展示。
   // 系统无手动加入通道（channel B 恒为 0），所有条目统一按 ①②③ 门槛过滤；全叉则隐藏。
-  const watch = watchRaw.filter(t => t.c1 && t.c2 && t.c3a);
+  const watch = watchRaw.filter(t => t.c1 && t.c2 && t.c3a && _passFilter(t, filter));
 
   // ---- 待上车（顶，按板块分组）----
   const rStage = $('lcReadyStage');
@@ -1279,6 +1281,70 @@ function notifyTSignalChanges(items){
     const sub = [dir, s.signal_name, s.reason].filter(Boolean).join(' · ');
     notifyPopup('新做T信号', (it.name || it.code) + ' ' + it.code, sub, 't-signal', it.secid, it.name);
   });
+}
+
+/* ---------- 明日高开候选（a-trade 次日高开逻辑） ---------- */
+let _gapPollTimer = null;
+async function loadNextDay(force){
+  const msg = $('gapPickMsg');
+  if(force && msg) msg.textContent = '正在刷新…';
+  try{
+    const f = _getFilter();
+    const qs = new URLSearchParams();
+    qs.set('main', f.main === false ? '0' : '1');
+    qs.set('chi_next', f.chiNext === false ? '0' : '1');
+    qs.set('st', f.st ? '1' : '0');
+    if(f.priceMin != null && f.priceMin !== '') qs.set('price_min', f.priceMin);
+    if(f.priceMax != null && f.priceMax !== '') qs.set('price_max', f.priceMax);
+    if(f.mcap) qs.set('mcap', f.mcap);
+    const d = await api('/api/next_day_gap?' + (force ? 'refresh=1&' : '') + qs.toString(), {timeout: 30000});
+    renderNextDay(d);
+    if(d.computing){
+      if(msg) msg.textContent = '后台计算中，稍后自动更新…';
+      if(!_gapPollTimer){
+        _gapPollTimer = setTimeout(() => { _gapPollTimer = null; loadNextDay(false); }, 10000);
+      }
+    } else if(msg){
+      if(d.last_err) msg.textContent = '上次计算失败：' + d.last_err;
+      else if(d.data) msg.textContent = '候选 ' + d.data.total + ' 只 · ' + d.data.date;
+      else msg.textContent = '暂无候选数据';
+    }
+  }catch(e){
+    if(msg) msg.textContent = '候选加载失败：' + e.message;
+  }
+}
+function renderNextDay(d){
+  const el = $('gapPickContent');
+  const data = d.data;
+  const rows = (data && data.candidates) || [];
+  if(!data){
+    el.innerHTML = '<div class="empty-hint">' + (d.computing ? '候选后台计算中…' : '暂无候选数据') + '</div>';
+    return;
+  }
+  if(!rows.length){
+    el.innerHTML = '<div class="empty-hint">今日暂无符合条件的次日高开候选</div>';
+    return;
+  }
+  el.innerHTML = `<div class="lc-lead"><span>次日高开 Top ${rows.length}</span><span class="bar"></span></div>
+    <table>
+      <thead><tr><th>排名</th><th class="l">代码 / 名称</th><th class="l">行业</th><th>现价</th><th>涨跌</th><th>量比</th><th>振幅%</th><th>板块涨停</th><th class="l">推荐原因</th><th>得分</th></tr></thead>
+      <tbody>${rows.map((r, i) => {
+        const code = String(r.code||'').padStart(6,'0');
+        const market = /^[689]/.test(code) ? 1 : 0;
+        return `<tr class="stk" onclick="focusStock('${market}.${esc(code)}','${esc(r.name||'')}')">
+          <td>${i+1}</td>
+          <td class="l"><b>${esc(r.name||'')}</b><br><span class="lc-code">${esc(code)}</span></td>
+          <td class="l">${esc(r.industry||'-')}</td>
+          <td>${Number(r.price||0).toFixed(2)}</td>
+          <td class="${Number(r.change_pct||0)>=0?'up':''}">${fmtPct(r.change_pct)}%</td>
+          <td>${Number(r.vol_ratio_5||0).toFixed(2)}</td>
+          <td>${Number(r.amplitude_pct||0).toFixed(2)}</td>
+          <td>${Number(r.industry_limit_count||0)}</td>
+          <td class="l" style="color:var(--sub);font-size:11px;line-height:1.5">${esc(r.reason||'')}</td>
+          <td><b>${Number(r.score||0)}</b></td>
+        </tr>`;
+      }).join('')}</tbody>
+    </table>`;
 }
 function tStrengthTxt(s){
   return {weak:'弱', medium:'中', strong:'强'}[s] || s || '-';

@@ -33,6 +33,7 @@ import picks   # ★选股买卖点实时扫描（配套 选股买卖点SOP.md v
 import sell     # ★持仓卖出信号（高位十字星/长下影→清仓、盈利≥30%→减仓；读 positions.json）
 import lifecycle # ★个股全生命周期状态机（双通道进自选→观察池→盘中即时提示/盘尾确认→上车→持仓→卖出三层；挂钩≥1天已废弃）
 import t_trade  # ★做 T 信号 / T 仓状态（移植 a-trade，数据源沿用 HKS 统一 K 线入口）
+import gap_pick  # ★次日高开候选（移植 a-trade，数据源沿用 HKS 统一 K 线 / 东方财富入口）
 import paths
 _TDX_LOCK = threading.Lock()   # easy_tdx 非线程安全：并发 kline/board_members 互相踩坏连接→静默返回 None。全局串行化 TDX 调用。
 
@@ -1912,6 +1913,31 @@ def api_picks():
         "last_err": picks.last_err(),
         "note": "选股买卖点为机械纪律枷锁（非Alpha引擎），回测扣费后净亏；仅供研究参考，不构成投资建议。",
         "data": picks.get_cache(),
+    })
+
+
+@app.route("/api/next_day_gap")
+def api_next_day_gap():
+    """次日高开候选：有缓存秒回，未缓存/过期时后台计算。"""
+    refresh = request.args.get("refresh") == "1"
+    scope = {
+        "main": request.args.get("main", "1") != "0",
+        "chi_next": request.args.get("chi_next", "1") != "0",
+        "st": request.args.get("st", "0") == "1",
+        "price_min": request.args.get("price_min") or None,
+        "price_max": request.args.get("price_max") or None,
+        "mcap": request.args.get("mcap") or None,
+    }
+    data = gap_pick.get_cache(scope)
+    if refresh:
+        gap_pick.trigger_refresh(scope)
+    return jsonify({
+        "ok": True,
+        "computing": gap_pick.is_computing(),
+        "ts": gap_pick.cache_ts(),
+        "last_err": gap_pick.last_err(),
+        "scope": scope,
+        "data": data,
     })
 
 

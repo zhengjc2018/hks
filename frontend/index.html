@@ -344,6 +344,20 @@
     </div>
   </section>
 
+  <!-- 区6 明日高开候选（a-trade 次日高开逻辑） -->
+  <section id="gapPick">
+    <h2>明日高开候选 <small>按设置交易权限扫描 · 排除证券/地产/白酒 · T+1 高开 ≥1%</small></h2>
+    <div class="card">
+      <div class="t-toolbar">
+        <button class="load-more" onclick="loadNextDay(true)">刷新候选</button>
+        <span id="gapPickMsg" style="font-size:12px;color:var(--sub)"></span>
+      </div>
+      <div id="gapPickContent">
+        <div class="empty-hint">暂无候选数据</div>
+      </div>
+    </div>
+  </section>
+
 </div>
 
 <!-- 我的持仓 独立弹窗 -->
