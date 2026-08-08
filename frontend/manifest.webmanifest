@@ -1,0 +1,22 @@
+{
+  "name": "A股机会雷达",
+  "short_name": "A股雷达",
+  "description": "A股多周期共振机会雷达",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#161f30",
+  "theme_color": "#161f30",
+  "icons": [
+    {
+      "src": "/assets/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/assets/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
