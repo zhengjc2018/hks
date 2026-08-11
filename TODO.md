@@ -7,6 +7,9 @@
 - [x] 全量主板块训练并验收（3184 只有效标的，Top10 70.3% vs 规则 56.8%，Top3 33.8% vs 规则 31.1%）
 - [x] `gap_model.json` 随 APK / EXE 一起打包（Android copy + EXE --add-data）
 - [x] Windows EXE 自动更新（检查 GitHub release / 下载 / 退出后替换重启）
+- [x] A：a-stock-data 数据模块 + 首页市场温度 + 个股详情数据面
+- [x] C：财联社/全球快讯面板
+- [x] B：百度日 K 兜底 + 腾讯行情封装（估值字段沿用腾讯）
 - [ ] 观察池推荐排序复用同一模型（后续再看）
 
 ## B 方案存档（scikit-learn 直装 App，后续再看）

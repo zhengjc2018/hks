@@ -36,6 +36,7 @@ import t_trade  # ★做 T 信号 / T 仓状态（移植 a-trade，数据源沿�
 import gap_pick  # ★次日高开候选（移植 a-trade，数据源沿用 HKS 统一 K 线 / 东方财富入口）
 import gap_model  # ★次日高开排序模型推理（纯 numpy，无模型时回退规则评分）
 import app_update  # ★Windows EXE 自动更新（检查/下载/退出后替换重启）
+import astock_data  # ★a-stock-data 移植：打板/资金流/龙虎榜/两融/研报/互动易/热度
 import paths
 _TDX_LOCK = threading.Lock()   # easy_tdx 非线程安全：并发 kline/board_members 互相踩坏连接→静默返回 None。全局串行化 TDX 调用。
 
@@ -246,11 +247,18 @@ def _klines(secid, klt, lmt):
     except Exception as e:
         print("[tdx] klines fallback -> sina:", e)
     sym = _sina_symbol(secid)
+    code = str(secid).split(".")[-1]
     if klt == 102:  # 周K：拉日K聚合（新浪无直接周K）
         rows = _sina_k(sym, 240, max(lmt * 5, 250))
-        return _agg_weekly(_sina_to_internal(rows))
+        daily = _sina_to_internal(rows)
+        if not daily:
+            daily = _sina_to_internal(astock_data.baidu_kline(code, max(lmt * 5, 250)))
+        return _agg_weekly(daily)
     scale = {101: 240, 5: 5, 60: 60, 15: 15}.get(klt, 240)
-    return _sina_to_internal(_sina_k(sym, scale, lmt))
+    out = _sina_to_internal(_sina_k(sym, scale, lmt))
+    if not out and klt == 101:
+        out = _sina_to_internal(astock_data.baidu_kline(code, lmt))
+    return out
 
 
 def _fetch_all_klines(secid):
@@ -1973,6 +1981,51 @@ def api_update_status():
 def api_update_apply():
     """Windows 打包版：启动更新器，退出后替换 exe 并重启。"""
     return jsonify(app_update.apply_update())
+
+
+@app.route("/api/market_sentiment")
+def api_market_sentiment():
+    """打板情绪：涨停/炸板/跌停/炸板率/最高连板/连板梯队/昨涨停晋级率。"""
+    return jsonify(astock_data.market_sentiment())
+
+
+@app.route("/api/board_fund_flow")
+def api_board_fund_flow():
+    """板块资金流向。type=industry|concept|region，period=today|5d|10d。"""
+    board_type = request.args.get("type", "industry")
+    period = request.args.get("period", "today")
+    try:
+        top_n = min(int(request.args.get("top_n", "20")), 200)
+    except (TypeError, ValueError):
+        top_n = 20
+    return jsonify(astock_data.board_fund_flow(board_type, period, top_n))
+
+
+@app.route("/api/hot_rank")
+def api_hot_rank():
+    """同花顺热榜 + 东财人气榜。"""
+    return jsonify({
+        "ths": astock_data.ths_hot_list(),
+        "em": astock_data.em_hot_rank(20),
+    })
+
+
+@app.route("/api/stock_extra")
+def api_stock_extra():
+    """个股数据面：龙虎榜/两融/大宗/股东户数/分红/资金流/研报/互动易/概念/新闻。"""
+    code = re.sub(r"\D", "", request.args.get("code", ""))
+    if len(code) != 6:
+        return jsonify({"error": "code 须为 6 位股票代码"}), 400
+    return jsonify(astock_data.stock_extra(code))
+
+
+@app.route("/api/telegraph")
+def api_telegraph():
+    """财联社电报 + 东财全球资讯（快讯面板）。"""
+    return jsonify({
+        "cls": astock_data.cls_telegraph(30),
+        "em": astock_data.eastmoney_global_news(30),
+    })
 
 
 @app.route("/api/sells")

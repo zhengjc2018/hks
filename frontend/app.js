@@ -213,7 +213,8 @@ function loadAll(){
     loadMarket(),
     loadSectors(),
     loadLifecycle(),
-    loadNextDay()
+    loadNextDay(),
+    loadAuxPanels()
   ]).finally(()=>{
     loadingCount--;
     $('updated').textContent = new Date().toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'})+' 更新';
@@ -268,6 +269,104 @@ function renderMarket(d){
   } else {
     mc.style.display='none';
   }
+}
+
+/* ---------- 区1.5：市场温度（a-stock-data） ---------- */
+let _auxLastLoad = 0;
+async function loadAuxPanels(){
+  const now = Date.now();
+  if(now - _auxLastLoad < 60000) return;   // 自动刷新 15s 一次，但数据面/热度 60s 节流
+  _auxLastLoad = now;
+  await Promise.allSettled([loadMarketSentiment(), loadFundFlow(), loadHotRank(), loadTelegraph()]);
+}
+async function loadMarketSentiment(){
+  const el = $('sentimentBody');
+  if(!el) return;
+  try{
+    const d = await api('/api/market_sentiment', {timeout:25000});
+    const ladder = Object.entries(d.ladder || {})
+      .map(([k,v]) => `<span class="aux-chip">${k}板 ${v}家</span>`).join('');
+    el.innerHTML =
+      `<div class="aux-row"><span class="nm">涨停</span><span class="val up">${d.zt_count||0} 家</span></div>` +
+      `<div class="aux-row"><span class="nm">炸板</span><span class="val">${d.zb_count||0} 家 · 炸板率 ${d.break_rate||0}%</span></div>` +
+      `<div class="aux-row"><span class="nm">跌停</span><span class="val down">${d.dt_count||0} 家</span></div>` +
+      `<div class="aux-row"><span class="nm">最高连板</span><span class="val">${d.max_height||0} 板</span></div>` +
+      `<div class="aux-row"><span class="nm">昨涨停晋级率</span><span class="val">${d.promotion_rate!=null ? d.promotion_rate+'%' : '-'}</span></div>` +
+      (ladder ? `<div class="aux-ladder">${ladder}</div>` : '');
+  }catch(e){
+    el.innerHTML = '<div class="empty-hint">暂无数据</div>';
+  }
+}
+let _fundType = 'industry';
+function switchFundTab(btn){
+  document.querySelectorAll('#auxPanels .aux-tab').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  _fundType = btn.dataset.type;
+  loadFundFlow();
+}
+async function loadFundFlow(){
+  const el = $('fundFlowBody');
+  if(!el) return;
+  const period = $('fundPeriod') ? $('fundPeriod').value : 'today';
+  el.innerHTML = '<div class="empty-hint">加载中...</div>';
+  try{
+    const d = await api('/api/board_fund_flow?type='+encodeURIComponent(_fundType)+'&period='+encodeURIComponent(period)+'&top_n=10', {timeout:35000});
+    if(!d || d.error || !d.rows){
+      el.innerHTML = '<div class="empty-hint">暂无数据</div>';
+      return;
+    }
+    const html = d.rows.map(r=>{
+      const main = (Number(r.main_net||0))/1e8;
+      const sign = main>=0?'+':'';
+      const cls = main>=0?'up':'down';
+      return `<div class="aux-row"><span class="nm">${r.rank}. ${esc(r.name||'')}</span><span class="val ${cls}">${sign}${main.toFixed(2)}亿</span></div>`;
+    }).join('');
+    el.innerHTML = html || '<div class="empty-hint">暂无数据</div>';
+  }catch(e){
+    el.innerHTML = '<div class="empty-hint">暂无数据</div>';
+  }
+}
+async function loadHotRank(){
+  const el = $('hotRankBody');
+  if(!el) return;
+  try{
+    const d = await api('/api/hot_rank', {timeout:25000});
+    const rows = (d.ths || []).slice(0,10);
+    el.innerHTML = rows.length ? rows.map(r=>{
+      const pct = Number(r.pct||0);
+      return `<div class="aux-row"><span class="nm">${r.rank||'-'}. ${esc(r.name||'')}</span><span class="val ${pct>=0?'up':'down'}">${fmtPct(pct)}%</span></div>`;
+    }).join('') : '<div class="empty-hint">暂无数据</div>';
+  }catch(e){
+    el.innerHTML = '<div class="empty-hint">暂无数据</div>';
+  }
+}
+let _newsSource = 'cls';
+let _telegraphData = {cls: [], em: []};
+function switchNewsTab(btn){
+  document.querySelectorAll('#auxPanels .aux-tab[data-src]').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  _newsSource = btn.dataset.src;
+  renderTelegraph();
+}
+async function loadTelegraph(){
+  const el = $('telegraphBody');
+  if(!el) return;
+  try{
+    const d = await api('/api/telegraph', {timeout:25000});
+    _telegraphData = {cls: d.cls || [], em: d.em || []};
+    renderTelegraph();
+  }catch(e){
+    el.innerHTML = '<div class="empty-hint">暂无数据</div>';
+  }
+}
+function renderTelegraph(){
+  const el = $('telegraphBody');
+  if(!el) return;
+  const rows = (_telegraphData[_newsSource] || []).slice(0,8);
+  el.innerHTML = rows.length ? rows.map(n=>{
+    const title = n.title || n.content || '';
+    return `<div class="aux-row"><span class="nm" title="${esc(title)}">${esc(title)}</span><span class="val" style="font-size:11px">${esc((n.time||'').slice(5,16))}</span></div>`;
+  }).join('') : '<div class="empty-hint">暂无数据</div>';
 }
 
 /* ---------- 区2：板块矩阵 ---------- */

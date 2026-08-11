@@ -104,6 +104,20 @@
   .load-more-wrap{display:flex;justify-content:center;margin:14px 0 4px}
   .load-more{padding:8px 22px;border:1px solid var(--line);border-radius:20px;background:var(--card);color:var(--accent);font:inherit;font-size:13px;cursor:pointer}
   .load-more:hover{background:#eef2f8}
+  /* 市场温度（a-stock-data） */
+  .aux-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px}
+  .aux-card{min-width:0}
+  .aux-head{font-weight:700;font-size:13px;margin-bottom:8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .aux-tabs{display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap;align-items:center}
+  .aux-tab{padding:3px 10px;border:1px solid var(--line);border-radius:6px;background:var(--card);cursor:pointer;font-size:12px;color:var(--text)}
+  .aux-tab.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+  .aux-row{display:flex;justify-content:space-between;align-items:baseline;gap:10px;font-size:12px;padding:5px 2px;border-bottom:1px dashed var(--line)}
+  .aux-row:last-child{border-bottom:none}
+  .aux-row .nm{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+  .aux-row .val{white-space:nowrap;font-weight:600}
+  .aux-ladder{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+  .aux-chip{font-size:11px;padding:2px 8px;border-radius:10px;background:#eef1f6;color:var(--sub)}
+  [data-theme="dark"] .aux-chip{background:#222a38}
   /* 系统评述已并入 regime 蓝框（regime-commentary），此处不再单独黄框 */
   .sec .sum.loading{color:#aab;font-style:italic}
 
@@ -271,6 +285,45 @@
       <div class="mkt-comm" id="mktComm" style="display:none">
         <div class="mc-title">📊 大盘走势评述</div>
         <div id="mktCommText"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 区1.5 市场温度（a-stock-data） -->
+  <section id="auxPanels">
+    <h2>市场温度 <small>打板情绪 · 板块资金 · 人气榜</small></h2>
+    <div class="aux-grid">
+      <div class="card aux-card">
+        <div class="aux-head">打板情绪</div>
+        <div id="sentimentBody"><div class="empty-hint">加载中...</div></div>
+      </div>
+      <div class="card aux-card">
+        <div class="aux-head">
+          <span>板块主力资金</span>
+          <select id="fundPeriod" style="font-size:12px" onchange="loadFundFlow()">
+            <option value="today">今日</option>
+            <option value="5d">5日</option>
+            <option value="10d">10日</option>
+          </select>
+        </div>
+        <div class="aux-tabs">
+          <button class="aux-tab active" data-type="industry" onclick="switchFundTab(this)">行业</button>
+          <button class="aux-tab" data-type="concept" onclick="switchFundTab(this)">概念</button>
+          <button class="aux-tab" data-type="region" onclick="switchFundTab(this)">地域</button>
+        </div>
+        <div id="fundFlowBody"><div class="empty-hint">加载中...</div></div>
+      </div>
+      <div class="card aux-card">
+        <div class="aux-head">人气榜 · 同花顺</div>
+        <div id="hotRankBody"><div class="empty-hint">加载中...</div></div>
+      </div>
+      <div class="card aux-card">
+        <div class="aux-head">快讯</div>
+        <div class="aux-tabs">
+          <button class="aux-tab active" data-src="cls" onclick="switchNewsTab(this)">财联社</button>
+          <button class="aux-tab" data-src="em" onclick="switchNewsTab(this)">全球</button>
+        </div>
+        <div id="telegraphBody"><div class="empty-hint">加载中...</div></div>
       </div>
     </div>
   </section>
@@ -454,6 +507,6 @@
   </div>
 </div>
 
-<script src="/assets/app.js?v=20260808u"></script>
+<script src="/assets/app.js?v=20260811a"></script>
 </body>
 </html>

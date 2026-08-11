@@ -93,6 +93,12 @@
   .risk-full { background: #fff; border: 1px solid #eef0f3; border-radius: 8px; overflow: hidden; }
   .risk-full h4 { font-size: 12px; color: #6b7280; margin: 0; padding: 8px 12px 4px; font-weight: 600;
                   background: #fafbfc; border-bottom: 1px solid #eef0f3; }
+  .data-tabs { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 12px; }
+  .data-tab { padding: 4px 10px; border: 1px solid #d0d5dd; border-radius: 6px; background: #fff;
+              cursor: pointer; font-size: 12px; color: #333; }
+  .data-tab.active { background: #2f6fed; color: #fff; border-color: #2f6fed; }
+  .data-body-wrap { padding: 0 12px 12px; max-height: 320px; overflow: auto; }
+  .data-empty { padding: 16px; text-align: center; color: #8a8f99; font-size: 12px; }
   table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
   th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid #eef0f3; }
   th { color: #8a8f99; font-weight: 600; background: #f5f6f8; }
@@ -142,6 +148,11 @@
       <div class="risk-full">
         <h4>风险独立复检（AlphaLoop）</h4>
         <div id="riskBody"></div>
+      </div>
+      <div class="risk-full" style="margin-top:8px">
+        <h4>数据面（a-stock-data）</h4>
+        <div class="data-tabs" id="dataTabs"></div>
+        <div class="data-body-wrap" id="dataBody"><div class="data-empty">加载中…</div></div>
       </div>
     </div>
   </div>
@@ -199,6 +210,7 @@ function sign(v){ if(v==null) return '-'; return (v>0?'+':'') + v.toFixed(2); }
 
 const charts = {};
 function mk(id){ if(charts[id]) charts[id].dispose(); const c = echarts.init(document.getElementById(id)); charts[id]=c; return c; }
+function esc(s){ const d=document.createElement('div'); d.textContent = s==null?'':String(s); return d.innerHTML; }
 
 /* K线 —— MA5/10/20/40 线条与指标值同色（HTML 浮层着色，绕开 ECharts title 限制） */
 function renderK(k){
@@ -364,6 +376,147 @@ function renderRisk(risk){
     `</tbody></table>`;
 }
 
+/* 数据面（a-stock-data）：龙虎榜 / 两融 / 大宗 / 股东户数 / 分红 / 资金流 / 研报 / 互动易 / 新闻 / 概念 */
+const _extraTabs = [
+  {key:'dragon', label:'龙虎榜'},
+  {key:'margin', label:'两融'},
+  {key:'block', label:'大宗'},
+  {key:'holder', label:'股东户数'},
+  {key:'dividend', label:'分红'},
+  {key:'fund', label:'资金流'},
+  {key:'reports', label:'研报'},
+  {key:'irm', label:'互动易'},
+  {key:'news', label:'个股新闻'},
+  {key:'concept', label:'概念热度'}
+];
+let _pvExtra = {};
+function _empty(html){ return '<div class="data-empty">' + (html || '暂无数据') + '</div>'; }
+function _yi(v){ const n=Number(v||0); return (n/1e8).toFixed(2)+'亿'; }
+function _wan(v){ const n=Number(v||0); if(Math.abs(n)>=1e8) return (n/1e8).toFixed(2)+'亿'; return (n/1e4).toFixed(0)+'万'; }
+function _tabTable(head, rows){ return '<table><thead><tr>'+head+'</tr></thead><tbody>'+rows.join('')+'</tbody></table>'; }
+function renderDragonTab(d){
+  const x = d.dragon_tiger || {};
+  const records = x.records || [];
+  if(!records.length) return _empty('近30日未上榜');
+  let html = _tabTable(
+    '<th>日期</th><th>原因</th><th>净买(万)</th><th>换手%</th>',
+    records.slice(0,10).map(r=>`<tr><td>${esc(r.date)}</td><td>${esc(r.reason)}</td><td>${fmt(r.net_buy,0)}</td><td>${fmt(r.turnover,2)}</td></tr>`)
+  );
+  const buy = (x.seats && x.seats.buy) || [], sell = (x.seats && x.seats.sell) || [];
+  if(buy.length){
+    html += '<div style="padding:8px 2px 4px;font-weight:700">买入席位 TOP5</div>' + _tabTable(
+      '<th>席位</th><th>买(万)</th><th>卖(万)</th><th>净(万)</th>',
+      buy.map(s=>`<tr><td>${esc(s.name)}</td><td>${fmt(s.buy_amt,0)}</td><td>${fmt(s.sell_amt,0)}</td><td>${fmt(s.net,0)}</td></tr>`)
+    );
+  }
+  if(sell.length){
+    html += '<div style="padding:8px 2px 4px;font-weight:700">卖出席位 TOP5</div>' + _tabTable(
+      '<th>席位</th><th>买(万)</th><th>卖(万)</th><th>净(万)</th>',
+      sell.map(s=>`<tr><td>${esc(s.name)}</td><td>${fmt(s.buy_amt,0)}</td><td>${fmt(s.sell_amt,0)}</td><td>${fmt(s.net,0)}</td></tr>`)
+    );
+  }
+  if(x.institution){
+    const inst = x.institution;
+    html += '<div style="padding:8px 2px 4px;font-weight:700">机构席位</div><div class="entry-line">买 ' +
+      fmt(inst.buy_amt,1) + '万 / 卖 ' + fmt(inst.sell_amt,1) + '万 / 净 ' + fmt(inst.net_amt,1) + '万</div>';
+  }
+  return html;
+}
+function renderMarginTab(d){
+  const rows = d.margin || [];
+  if(!rows.length) return _empty();
+  return _tabTable(
+    '<th>日期</th><th>融资余额</th><th>融资买入</th><th>融券余额</th><th>两融合计</th>',
+    rows.slice(0,10).map(r=>`<tr><td>${esc(r.date)}</td><td>${_yi(r.rzye)}</td><td>${_yi(r.rzmre)}</td><td>${_yi(r.rqye)}</td><td>${_yi(r.rzrqye)}</td></tr>`)
+  );
+}
+function renderBlockTab(d){
+  const rows = d.block_trade || [];
+  if(!rows.length) return _empty();
+  return _tabTable(
+    '<th>日期</th><th>成交价</th><th>溢价%</th><th>成交量(股)</th><th>买方</th><th>卖方</th>',
+    rows.slice(0,10).map(r=>`<tr><td>${esc(r.date)}</td><td>${fmt(r.price,2)}</td><td>${fmt(r.premium_pct,2)}</td><td>${fmt(r.vol,0)}</td><td>${esc(r.buyer)}</td><td>${esc(r.seller)}</td></tr>`)
+  );
+}
+function renderHolderTab(d){
+  const rows = d.holder || [];
+  if(!rows.length) return _empty();
+  return _tabTable(
+    '<th>报告期</th><th>股东户数</th><th>环比%</th><th>户均持股</th>',
+    rows.map(r=>`<tr><td>${esc(r.date)}</td><td>${fmt(r.holder_num,0)}</td><td>${fmt(r.change_ratio,2)}</td><td>${fmt(r.avg_shares,0)}</td></tr>`)
+  );
+}
+function renderDividendTab(d){
+  const rows = d.dividend || [];
+  if(!rows.length) return _empty();
+  return _tabTable(
+    '<th>除权日</th><th>每股派息</th><th>每10送</th><th>每10转</th><th>进度</th>',
+    rows.map(r=>`<tr><td>${esc(r.date)}</td><td>${fmt(r.bonus_rmb,2)}元</td><td>${fmt(r.bonus_ratio,0)}</td><td>${fmt(r.transfer_ratio,0)}</td><td>${esc(r.plan)}</td></tr>`)
+  );
+}
+function renderFundTab(d){
+  const rows = d.fund_flow || [];
+  if(!rows.length) return _empty();
+  return _tabTable(
+    '<th>日期</th><th>主力净额</th><th>超大单</th><th>大单</th><th>中单</th><th>小单</th>',
+    rows.slice().reverse().map(r=>`<tr><td>${esc(r.date)}</td><td>${_wan(r.main_net)}</td><td>${_wan(r.super_net)}</td><td>${_wan(r.large_net)}</td><td>${_wan(r.mid_net)}</td><td>${_wan(r.small_net)}</td></tr>`)
+  );
+}
+function renderReportsTab(d){
+  const rows = d.reports || [];
+  if(!rows.length) return _empty('暂无研报覆盖');
+  return _tabTable(
+    '<th>日期</th><th>机构</th><th>评级</th><th>标题</th>',
+    rows.slice(0,20).map(r=>`<tr><td>${esc(r.date)}</td><td>${esc(r.org)}</td><td>${esc(r.rating||'-')}</td><td>${esc(r.title)}</td></tr>`)
+  );
+}
+function renderIrmTab(d){
+  const rows = d.irm || [];
+  if(!rows.length) return _empty();
+  return rows.map(r=>`<div class="entry-line" style="padding:5px 2px;border-bottom:1px dashed #eef0f3">
+    <b>${esc(r.ask_time||'-')}</b> Q：${esc(r.question||'')}<br>
+    A[${esc(r.answerer||'-')}]：${esc(r.answer||'暂未回复')}</div>`).join('');
+}
+function renderNewsTab(d){
+  const rows = d.news || [];
+  if(!rows.length) return _empty();
+  return rows.map(n=>`<div class="entry-line" style="padding:5px 2px;border-bottom:1px dashed #eef0f3">
+    <b>${esc(n.time||'-')}</b> ${esc(n.source||'')} · ${esc(n.title||'')}</div>`).join('');
+}
+function renderConceptTab(d){
+  const rows = d.hot_concept || [];
+  if(!rows.length) return _empty();
+  return _tabTable(
+    '<th>概念</th><th>热度</th>',
+    rows.slice(0,20).map(r=>`<tr><td>${esc(r.concept)}</td><td>${fmt(r.hit,0)}</td></tr>`)
+  );
+}
+function switchDataTab(key){
+  document.querySelectorAll('#dataTabs .data-tab').forEach(b=>b.classList.toggle('active', b.dataset.tab===key));
+  const fn = {
+    dragon: renderDragonTab, margin: renderMarginTab, block: renderBlockTab,
+    holder: renderHolderTab, dividend: renderDividendTab, fund: renderFundTab,
+    reports: renderReportsTab, irm: renderIrmTab, news: renderNewsTab, concept: renderConceptTab
+  }[key];
+  document.getElementById('dataBody').innerHTML = fn ? fn(_pvExtra) : _empty();
+}
+async function loadStockExtra(code){
+  const tabs = document.getElementById('dataTabs');
+  tabs.innerHTML = _extraTabs.map(t=>`<button class="data-tab${t.key==='dragon'?' active':''}" data-tab="${t.key}" onclick="switchDataTab('${t.key}')">${t.label}</button>`).join('');
+  try{
+    const ctrl = new AbortController();
+    const tid = setTimeout(()=>ctrl.abort(), 60000);
+    const r = await fetch('/api/stock_extra?code='+encodeURIComponent(code), {signal: ctrl.signal});
+    clearTimeout(tid);
+    const d = await r.json();
+    if(d.error){ document.getElementById('dataBody').innerHTML = _empty(esc(d.error)); return; }
+    _pvExtra = d;
+    switchDataTab('dragon');
+  }catch(e){
+    document.getElementById('dataBody').innerHTML = _empty('数据面加载失败：'+esc(e.message));
+  }
+}
+
 /* 头部 */
 function renderHead(d){
   document.getElementById('pvTitle').textContent = `${d.code} ${d.name}`;
@@ -418,6 +571,7 @@ async function load(){
     pvLoadHoldings();
     renderK(d.kdata); renderMacd(d.kdata); renderRsi(d.kdata);
     renderEntry(d); renderSignals(d.eval, d.seq); renderRisk(d.risk);
+    loadStockExtra(code);
     if(d && d.llm_pending){ startStockFill(code, market, d); }
   }catch(e){
     sigBody.innerHTML = `<div class="loading">加载异常：${esc(e.message)}</div>`;
