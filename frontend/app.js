@@ -321,7 +321,8 @@ async function loadFundFlow(){
       const cls = main>=0?'up':'down';
       return `<div class="aux-row"><span class="nm">${r.rank}. ${esc(r.name||'')}</span><span class="val ${cls}">${sign}${main.toFixed(2)}亿</span></div>`;
     }).join('');
-    el.innerHTML = html || '<div class="empty-hint">暂无数据</div>';
+    el.innerHTML = html ||
+      (d.note ? `<div class="empty-hint">${esc(d.note)}</div>` : '<div class="empty-hint">暂无数据</div>');
   }catch(e){
     el.innerHTML = '<div class="empty-hint">暂无数据</div>';
   }

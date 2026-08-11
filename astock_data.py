@@ -51,6 +51,8 @@ EM_MIN_INTERVAL = 0.8
 _EXTRA_LOCK = threading.Lock()
 _EXTRA_CACHE = {}
 EXTRA_TTL = 6 * 3600
+_BOARD_EMPTY = {}
+_BOARD_EMPTY_LOCK = threading.Lock()
 
 
 def em_get(url, params=None, headers=None, timeout=15):
@@ -289,6 +291,17 @@ def board_fund_flow(board_type="industry", period="today", top_n=20):
         return {"error": f"board_type 须为 {list(_BOARD_FS)}"}
     if period not in _BOARD_PERIOD:
         return {"error": f"period 须为 {list(_BOARD_PERIOD)}"}
+    cache_key = f"{board_type}:{period}"
+    with _BOARD_EMPTY_LOCK:
+        until = _BOARD_EMPTY.get(cache_key, 0)
+    if time.time() < until:
+        return {
+            "board_type": board_type,
+            "period": period,
+            "total": 0,
+            "rows": [],
+            "note": "板块资金流源暂不可用，5分钟后重试",
+        }
     fid, f_main, f_pct, f_chg, f_leader = _BOARD_PERIOD[period]
     fields = ["f12", "f14", f_chg, f_main, f_pct]
     if f_leader:
@@ -316,6 +329,16 @@ def board_fund_flow(board_type="industry", period="today", top_n=20):
             return [], 0
 
     items, total = _page(1)
+    if not items:
+        with _BOARD_EMPTY_LOCK:
+            _BOARD_EMPTY[cache_key] = time.time() + 300
+        return {
+            "board_type": board_type,
+            "period": period,
+            "total": 0,
+            "rows": [],
+            "note": "板块资金流源暂不可用，5分钟后重试",
+        }
     pn = 2
     while len(items) < top_n:
         if total and len(items) >= total:
